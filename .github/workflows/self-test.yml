@@ -6,8 +6,20 @@ on:
   pull_request:
 
 jobs:
+  lint-workflows:
+    name: actionlint (all workflows)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run actionlint
+        # shellcheck severity を warning 以上に絞る（SC2086 等の info は false positive が多い）
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 \
+            -color -shellcheck "shellcheck -S warning"
+
   test-ci-next:
     name: Test ci-next.yml (minimal fixture)
+    needs: lint-workflows
     uses: ./.github/workflows/ci-next.yml
     with:
       working-directory: fixtures/minimal-next
