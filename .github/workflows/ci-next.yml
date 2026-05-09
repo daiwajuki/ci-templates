@@ -51,6 +51,8 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
+        env:
+          GH_PACKAGES_TOKEN: ${{ github.token }}
 
       - name: Check scripts
         id: scripts
