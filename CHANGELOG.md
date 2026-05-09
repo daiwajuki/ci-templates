@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/daiwajuki/ci-templates/compare/v0.5.0...v0.5.1) (2026-05-09)
+
+
+### Fixed
+
+* **workflows:** defensive-quote $GITHUB_OUTPUT and $GITHUB_STEP_SUMMARY in run scripts ([#13](https://github.com/daiwajuki/ci-templates/issues/13)) ([409e4e5](https://github.com/daiwajuki/ci-templates/commit/409e4e5cdd8fad7fdd9a3237ff8fc381530a85d0))
+
 ## [0.5.0] - 2026-05-09
 
 ### Added
