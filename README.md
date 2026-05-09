@@ -123,14 +123,14 @@ _ci-templates/
 
 ## ロードマップ
 
-| Phase | 内容 |
-|---|---|
-| **A（現行）** | リポジトリ初期化・`ci-next.yml` 公開 |
-| **B** | Portal で試験導入・deploy-cloudrun-next.yml 追加 |
-| **C** | Dockerfile / docker-compose の copy 配布・`sync-templates.mjs` |
-| **D** | Workload Identity Federation composite action・JSON キー廃止 |
-| **E** | 残り 13 プロジェクトに横展開・FastAPI / Laravel 用 CI 追加 |
-| **F** | release-please / Renovate 配給・`audit-ci-drift.mjs` 有効化 |
+| Phase | 内容 | 状態 |
+|---|---|---|
+| **A** | リポジトリ初期化・`ci-next.yml` 公開 | ✅ 完了 |
+| **B** | Portal で試験導入・deploy-cloudrun-next.yml 追加 | ✅ 完了 |
+| **C** | Dockerfile / docker-compose の copy 配布・`sync-templates.mjs` | ⏳ 未着手 |
+| **D** | Workload Identity Federation composite action・JSON キー廃止 | ⏳ 未着手 |
+| **E** | 残り 10 プロジェクトに横展開・FastAPI / Laravel 用 CI 追加 | 🚧 進行中（4/14 採用、CI/Deploy 6 種公開済み） |
+| **F** | release-please / Renovate 配給・`audit-ci-drift.mjs` 有効化 | 🚧 進行中（release-please 完了、audit-ci-drift は [設計済み](docs/audit-ci-drift-design.md)） |
 
 ## 採用状況（最終確認: 2026-05-09）
 
