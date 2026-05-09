@@ -1,0 +1,13 @@
+{
+  "name": "minimal-next-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'build ok'",
+    "lint": "echo 'lint ok'",
+    "typecheck": "echo 'typecheck ok'"
+  },
+  "volta": {
+    "node": "20"
+  }
+}

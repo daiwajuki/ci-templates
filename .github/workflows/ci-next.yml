@@ -1,0 +1,79 @@
+name: CI (Next.js)
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node バージョン（volta フィールドがない場合のフォールバック）
+        type: string
+        default: '20'
+      working-directory:
+        description: Next.js プロジェクトルート（monorepo の場合に指定）
+        type: string
+        default: '.'
+      run-lint:
+        description: lint ステップを実行するか
+        type: boolean
+        default: true
+      run-typecheck:
+        description: typecheck ステップを実行するか
+        type: boolean
+        default: true
+      run-build:
+        description: build ステップを実行するか
+        type: boolean
+        default: true
+      build-env-file:
+        description: ビルド時に .env.local としてコピーする env ファイルのパス（不要なら空）
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Lint / Typecheck / Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: daiwajuki/ci-templates/.github/actions/setup-node-volta@v0
+        with:
+          fallback-version: ${{ inputs.node-version }}
+          working-directory: ${{ inputs.working-directory }}
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Check scripts
+        id: scripts
+        run: |
+          HAS_LINT=$(node -e "const s=require('./package.json').scripts||{};process.stdout.write(s.lint?'true':'false')")
+          HAS_TYPECHECK=$(node -e "const s=require('./package.json').scripts||{};process.stdout.write(s.typecheck?'true':'false')")
+          echo "has-lint=$HAS_LINT" >> "$GITHUB_OUTPUT"
+          echo "has-typecheck=$HAS_TYPECHECK" >> "$GITHUB_OUTPUT"
+
+      - name: Lint
+        if: inputs.run-lint && steps.scripts.outputs.has-lint == 'true'
+        run: npm run lint
+
+      - name: Typecheck
+        if: inputs.run-typecheck && steps.scripts.outputs.has-typecheck == 'true'
+        run: npm run typecheck
+
+      - name: Copy env file for build
+        if: inputs.run-build && inputs.build-env-file != ''
+        run: cp "${{ inputs.build-env-file }}" .env.local
+
+      - name: Build
+        if: inputs.run-build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'

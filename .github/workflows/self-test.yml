@@ -1,0 +1,16 @@
+name: Self-test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test-ci-next:
+    name: Test ci-next.yml (minimal fixture)
+    uses: ./.github/workflows/ci-next.yml
+    with:
+      working-directory: fixtures/minimal-next
+      run-lint: true
+      run-typecheck: true
+      run-build: true

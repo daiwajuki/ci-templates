@@ -1,0 +1,35 @@
+name: Setup Node (Volta-aware)
+description: package.json の volta.node を尊重して Node をセットアップし npm キャッシュを有効化する
+
+inputs:
+  fallback-version:
+    description: volta フィールドがない場合の Node バージョン
+    default: '20'
+  working-directory:
+    description: package.json を探すディレクトリ
+    default: '.'
+
+outputs:
+  node-version:
+    description: セットアップされた Node バージョン
+    value: ${{ steps.detect.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect Node version from volta
+      id: detect
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ -f package.json ]; then
+          VERSION=$(node -e "try{const v=require('./package.json').volta?.node;process.stdout.write(v||'')}catch{}" 2>/dev/null)
+        fi
+        echo "version=${VERSION:-${{ inputs.fallback-version }}}" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ steps.detect.outputs.version }}
+        cache: npm
+        cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
