@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.4.1] - 2026-05-09
+
+### Fixed
+
+- `ci-next.yml`: `colocate-token` secret を `COLOCATE_TOKEN` にリネーム。GitHub Actions の secret 名はハイフン不可（英数字とアンダースコアのみ）の仕様で、旧名は空文字に評価されて `github.token` フォールバックが効き、クロスリポジトリ private アクセスで 403 になっていた
+
+### Breaking change（v0.2.0〜v0.4.0 の `colocate-token` 利用者向け）
+
+呼び出し側の `secrets:` ブロックを以下のように更新する必要あり:
+
+```yaml
+# Before (v0.2.0〜v0.4.0)
+secrets:
+  colocate-token: ${{ secrets.DS_REPO_TOKEN }}
+
+# After (v0.4.1+)
+secrets:
+  COLOCATE_TOKEN: ${{ secrets.DS_REPO_TOKEN }}
+```
+
+`@v0` floating tag は本リリースを指す。旧名のまま `colocate-repo` を private で使っていた呼び出し側は build 失敗するため、本フィックスに合わせて更新が必要。
+
 ## [0.4.0] - 2026-05-09
 
 ### Added
