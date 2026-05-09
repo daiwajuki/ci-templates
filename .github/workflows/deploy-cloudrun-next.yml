@@ -75,6 +75,15 @@ on:
         description: colocate-repo の配置先（GITHUB_WORKSPACE からの相対パス、例 "_design-system"）
         type: string
         default: ''
+      build-args:
+        description: |
+          Dockerfile に渡す build-arg（KEY=VALUE 改行区切り、image モードのみ）。
+          機密値は呼び出し側の secrets.* を経由して渡す（`KEY=${{ secrets.X }}`）。
+          例:
+            GH_PACKAGES_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            NEXT_PUBLIC_BASE_URL=https://example.com
+        type: string
+        default: ''
       timeout-minutes:
         description: ジョブのタイムアウト（分）
         type: number
@@ -167,6 +176,7 @@ jobs:
           context: ${{ steps.ctx.outputs.value }}
           file: ${{ inputs.dockerfile-path }}
           push: true
+          build-args: ${{ inputs.build-args }}
           tags: |
             ${{ steps.image.outputs.sha_tag }}
             ${{ steps.image.outputs.latest_tag }}
