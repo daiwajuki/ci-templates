@@ -12,10 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run actionlint
-        # shellcheck severity を warning 以上に絞る（SC2086 等の info は false positive が多い）
+        # shellcheck severity はデフォルト（style 以上）。SC2086 等を含む全 finding を error 扱いし、
+        # 防御的クォート漏れの再発を防ぐ。
         run: |
-          docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 \
-            -color -shellcheck "shellcheck -S warning"
+          docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
 
   test-ci-next:
     name: Test ci-next.yml (minimal fixture)
