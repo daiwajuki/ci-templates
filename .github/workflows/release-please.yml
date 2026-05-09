@@ -1,0 +1,48 @@
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      major: ${{ steps.release.outputs.major }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  update-floating-tag:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Move floating major tag to released commit
+        env:
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+          MAJOR: ${{ needs.release-please.outputs.major }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # release-please は v{MAJOR}.{MINOR}.{PATCH} タグを既に作成済み
+          # こちらは floating major タグ v{MAJOR} を同じコミットに force 移動する
+          FLOATING_TAG="v${MAJOR}"
+          echo "Moving ${FLOATING_TAG} to ${TAG_NAME}"
+          git tag -f -a "${FLOATING_TAG}" -m "floating tag: latest v${MAJOR}.x" "${TAG_NAME}"
+          git push origin "${FLOATING_TAG}" --force
