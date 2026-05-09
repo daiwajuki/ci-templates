@@ -87,6 +87,13 @@ on:
       colocate-token:
         description: colocate-repo がプライベートの場合のアクセストークン（未指定時は github.token）
         required: false
+      GH_PACKAGES_TOKEN:
+        description: |
+          GitHub Packages 読み取り用トークン（org secret 推奨）。
+          複数 repo に跨る private packages を npm install するために必要。
+          未指定時は secrets.GITHUB_TOKEN にフォールバック（同 repo 内 packages のみ読める）。
+          secret 名はハイフン不可のためアンダースコアで命名。
+        required: false
 
 permissions:
   contents: read
@@ -175,7 +182,7 @@ jobs:
         run: |
           {
             echo 'value<<EOF_BUILDARGS'
-            echo "GH_PACKAGES_TOKEN=${{ secrets.GITHUB_TOKEN }}"
+            echo "GH_PACKAGES_TOKEN=${{ secrets.GH_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}"
             if [ -n "$USER_BUILD_ARGS" ]; then
               echo "$USER_BUILD_ARGS"
             fi
