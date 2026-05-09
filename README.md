@@ -131,10 +131,13 @@ _ci-templates/
 
 各プロジェクトの `.github/workflows/*.yml` に `daiwajuki/ci-templates` の `uses:` を持つかで実測：
 
-| プロジェクト | 状態 | 備考 |
-|---|---|---|
-| Portal | ✅ 採用済み | Phase B（試験導入） |
-| 残り 13 | ⏳ 未採用 | Phase E で横展開 |
+| プロジェクト | 状態 | 採用 workflow | 備考 |
+|---|---|---|---|
+| Portal | ✅ 採用済み | ci.yml, deploy.yml | Phase B（試験導入） |
+| ICPCostHub | ✅ 採用済み | ci.yml, deploy-api.yml, deploy-web.yml | Phase E 横展開 |
+| ICPEstimating | ✅ 採用済み | deploy-api.yml, deploy-web.yml | Phase E 横展開（CI は別途） |
+| PayrollManager | ✅ 採用済み | ci.yml | Phase E 横展開 |
+| 残り 10 | ⏳ 未採用 | — | Phase E で順次横展開 |
 
 確認コマンド:
 ```bash
