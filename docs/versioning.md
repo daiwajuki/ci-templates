@@ -29,7 +29,7 @@ git push origin v1 --force
 各プロジェクトの `uses:` では floating major タグを参照する：
 
 ```yaml
-uses: daiwajuki/ci-templates/.github/workflows/ci-next.yml@v1
+uses: daiwajuki/daiwajuki-ci-templates/.github/workflows/ci-next.yml@v1
 ```
 
 これにより **PATCH / MINOR は全プロジェクトに自動波及**し、MAJOR はタグを上げる明示的な操作が必要になる。
