@@ -27,6 +27,34 @@ on:
         description: ビルド時に .env.local としてコピーする env ファイルのパス（不要なら空）
         type: string
         default: ''
+      build-env:
+        description: |
+          ビルド時に .env.local に追記する KEY=VALUE の複数行文字列。
+          build-env-file と併用した場合は build-env が後追記される。
+          機密値は呼び出し側で secrets を経由し、build-env-file 経由で渡すこと。
+        type: string
+        default: ''
+      colocate-repo:
+        description: |
+          lint / typecheck / build 前に外部リポジトリを sibling パスに配置する。
+          例: "owner/repo" 形式。
+          相対 import が親ディレクトリの兄弟パッケージを参照する構成（_design-system 等）向け。
+        type: string
+        default: ''
+      colocate-ref:
+        description: colocate-repo のチェックアウト ref（タグ・ブランチ・SHA）
+        type: string
+        default: ''
+      colocate-path:
+        description: |
+          colocate-repo の配置先（GITHUB_WORKSPACE からの相対パス）。
+          例: "../_design-system" で workspace の親ディレクトリに兄弟配置。
+        type: string
+        default: ''
+    secrets:
+      colocate-token:
+        description: colocate-repo がプライベートの場合のアクセストークン（未指定時は github.token）
+        required: false
 
 permissions:
   contents: read
@@ -43,6 +71,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Checkout colocate-repo
+        if: inputs.colocate-repo != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.colocate-repo }}
+          ref: ${{ inputs.colocate-ref }}
+          token: ${{ secrets.colocate-token || github.token }}
+          path: __colocate__
+
+      - name: Place colocate-repo at expected path
+        if: inputs.colocate-repo != ''
+        working-directory: ${{ github.workspace }}
+        env:
+          COLOCATE_PATH: ${{ inputs.colocate-path }}
+        run: |
+          set -euo pipefail
+          dest="$GITHUB_WORKSPACE/$COLOCATE_PATH"
+          mkdir -p "$(dirname "$dest")"
+          rm -rf "$dest"
+          cp -r "$GITHUB_WORKSPACE/__colocate__" "$dest"
+          rm -rf "$GITHUB_WORKSPACE/__colocate__"
 
       - name: Setup Node
         uses: daiwajuki/ci-templates/.github/actions/setup-node-volta@v0
@@ -74,6 +124,13 @@ jobs:
       - name: Copy env file for build
         if: inputs.run-build && inputs.build-env-file != ''
         run: cp "${{ inputs.build-env-file }}" .env.local
+
+      - name: Append build-env vars
+        if: inputs.run-build && inputs.build-env != ''
+        env:
+          BUILD_ENV: ${{ inputs.build-env }}
+        run: |
+          printf '%s\n' "$BUILD_ENV" >> .env.local
 
       - name: Build
         if: inputs.run-build
