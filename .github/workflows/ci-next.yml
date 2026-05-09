@@ -55,8 +55,8 @@ on:
       GH_PACKAGES_TOKEN:
         description: GitHub Packages 読み取り用トークン（org secret。未指定時は github.token で試行）
         required: false
-      colocate-token:
-        description: colocate-repo がプライベートの場合のアクセストークン（未指定時は github.token）
+      COLOCATE_TOKEN:
+        description: colocate-repo がプライベートの場合のアクセストークン（未指定時は github.token）。secret 名はハイフン不可のためアンダースコアで命名。
         required: false
 
 permissions:
@@ -81,7 +81,7 @@ jobs:
         with:
           repository: ${{ inputs.colocate-repo }}
           ref: ${{ inputs.colocate-ref }}
-          token: ${{ secrets.colocate-token || github.token }}
+          token: ${{ secrets.COLOCATE_TOKEN || github.token }}
           path: __colocate__
 
       - name: Place colocate-repo at expected path

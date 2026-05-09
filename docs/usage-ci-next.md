@@ -34,7 +34,7 @@ jobs:
 
 | secret | 必須 | 説明 |
 |---|---|---|
-| `colocate-token` | optional | colocate-repo がプライベートの場合のアクセストークン（未指定時は `github.token`） |
+| `COLOCATE_TOKEN` | optional | colocate-repo がプライベートの場合のアクセストークン（未指定時は `github.token`） |
 
 ## ケース別設定例
 
@@ -91,7 +91,7 @@ jobs:
       colocate-ref: v1.11.0
       colocate-path: ../_design-system
     secrets:
-      colocate-token: ${{ secrets.DS_REPO_TOKEN }}
+      COLOCATE_TOKEN: ${{ secrets.DS_REPO_TOKEN }}
 ```
 
 挙動:
@@ -99,7 +99,7 @@ jobs:
 2. `cp -r` で `$GITHUB_WORKSPACE/$COLOCATE_PATH` へ配置
 3. `__colocate__/` を削除
 
-`colocate-path` が `../*` の場合、ワークスペースの親に配置される。プライベートリポジトリの場合は `colocate-token` 必須。
+`colocate-path` が `../*` の場合、ワークスペースの親に配置される。プライベートリポジトリの場合は `COLOCATE_TOKEN` 必須。
 
 ### lint のみ（typecheck・build はスキップ）
 
