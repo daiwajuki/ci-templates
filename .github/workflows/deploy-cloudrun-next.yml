@@ -96,6 +96,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  packages: read
 
 jobs:
   deploy:
@@ -169,6 +170,23 @@ jobs:
           echo "sha_tag=${BASE}:${{ github.sha }}" >> $GITHUB_OUTPUT
           echo "latest_tag=${BASE}:latest" >> $GITHUB_OUTPUT
 
+      # GitHub Packages 認証用トークンは inputs 経由では redact されるため、
+      # workflow 内で secrets.GITHUB_TOKEN を直接展開して build-args に prepend する
+      - name: Compose build-args with GitHub Packages token
+        if: inputs.build-mode == 'image'
+        id: build-args
+        env:
+          USER_BUILD_ARGS: ${{ inputs.build-args }}
+        run: |
+          {
+            echo 'value<<EOF_BUILDARGS'
+            echo "GH_PACKAGES_TOKEN=${{ secrets.GITHUB_TOKEN }}"
+            if [ -n "$USER_BUILD_ARGS" ]; then
+              echo "$USER_BUILD_ARGS"
+            fi
+            echo 'EOF_BUILDARGS'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and push image
         if: inputs.build-mode == 'image'
         uses: docker/build-push-action@v5
@@ -176,7 +194,7 @@ jobs:
           context: ${{ steps.ctx.outputs.value }}
           file: ${{ inputs.dockerfile-path }}
           push: true
-          build-args: ${{ inputs.build-args }}
+          build-args: ${{ steps.build-args.outputs.value }}
           tags: |
             ${{ steps.image.outputs.sha_tag }}
             ${{ steps.image.outputs.latest_tag }}
