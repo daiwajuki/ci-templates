@@ -84,6 +84,7 @@ jobs:
 | secret | 必須 | 説明 |
 |---|---|---|
 | `colocate-token` | 任意 | colocate-repo がプライベートの場合の PAT。未指定時は `github.token` |
+| `GH_PACKAGES_TOKEN` | 任意 | GitHub Packages の private dependency を取得するためのトークン (例: `@daiwajuki/ui-design`)。未指定時は `secrets.GITHUB_TOKEN` に自動フォールバック (同 owner の package まで読める)。詳細は下記「GitHub Packages 経由の private dependency」を参照 |
 
 ## なぜ smoke で 200/302/307 を許容するか
 
@@ -116,6 +117,45 @@ caller の repository に以下を設定：
 ### Secrets（任意）
 - `DS_REPO_TOKEN` — `_design-system` を colocate-repo として使う場合の PAT（Contents: Read-only）
 
+## GitHub Packages 経由の private dependency
+
+`@daiwajuki/ui-design` / `@daiwajuki/auth` 等を GitHub Packages から取得する場合の前提。
+
+### 認証フロー
+
+reusable workflow 内部では以下の順で token を解決:
+
+```
+secrets.GH_PACKAGES_TOKEN  (caller 側で明示渡し or org secret)
+       ↓ 未指定時
+secrets.GITHUB_TOKEN       (auto-injected。同 owner の package まで読める)
+```
+
+`source` モードでは npm ci の env var、`image` モードでは Docker build-arg として注入される。
+
+### caller 側の最小設定
+
+```yaml
+jobs:
+  deploy:
+    uses: daiwajuki/ci-templates/.github/workflows/deploy-cloudrun-next.yml@v0
+    secrets: inherit  # ← これだけで GH_PACKAGES_TOKEN / GITHUB_TOKEN 両方が継承される
+    with:
+      build-mode: image
+      ...
+```
+
+### Package 側の access 設定 (**必須**)
+
+> ⚠ ここを忘れると `npm error 403 permission_denied: read_package` で必ず失敗する。これは workflow / token の問題ではなく **package の access policy** の問題。
+
+1. GitHub Web UI で対象 package の settings を開く
+   - 例: https://github.com/orgs/daiwajuki/packages/npm/ui-design/settings
+2. **Manage Actions access** → **Add Repository** → 利用する consumer リポジトリを Read role で追加
+3. (推奨) **Connect Repository** で source repo を link しておくと、source repo の collaborator が自動継承される
+
+複数 package・複数 consumer の組合せがあるため、新規プロジェクト追加時は **必ず両方の package 側で access を付与** すること。
+
 ## トラブルシューティング
 
 | 症状 | 原因 | 解決 |
@@ -124,3 +164,4 @@ caller の repository に以下を設定：
 | image build で `COPY _design-system` が失敗 | colocate-path がコンテキスト外 | `build-context: '.'` にする |
 | smoke で 503 が返り続ける | コンテナが起動失敗 | Cloud Run logs を確認、`PORT` env を読んでいるか / Dockerfile の CMD を点検 |
 | 認証 redirect で 401 になる | `smoke-expected-statuses` に 401 が無い | 専用 health endpoint を作るのが推奨 |
+| `npm error 403 permission_denied: read_package` (例: `@daiwajuki/ui-design`) | Package 側の Manage Actions access に consumer repo が無い | 上記「Package 側の access 設定」参照。token 側ではなく package 側の権限問題 |

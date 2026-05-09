@@ -94,10 +94,15 @@ jobs:
 
 ## バージョニング
 
-- `v0.x`: 初期フェーズ。破壊変更は MINOR に含まれる場合あり
-- `v1.0.0` 以降: [semver](https://semver.org/) 厳格適用
+| バージョン | 含めて良い変更 | 採用側の影響 |
+|---|---|---|
+| **PATCH** (`0.x.Y`) | バグ修正のみ。**Breaking Change 禁止** | 黙って動く |
+| **MINOR** (`0.X.0`) | 新機能 + `v0.x` 特例で Breaking 可（CHANGELOG に明記必須） | `@v0` 採用側は CHANGELOG を確認 |
+| **MAJOR** (`X.0.0`) | Breaking Change（`v1.0.0` 以降） | `@vN` → `@vN+1` 手動更新が必要 |
 
 各プロジェクトは floating major タグ（`@v0`, `@v1`）を参照する。詳細は [docs/versioning.md](docs/versioning.md) 参照。
+
+> **重要**: PATCH に Breaking を入れない規約は `v0.x` でも厳格適用。0.4.1 で secret rename を PATCH に含めた事故の再発防止。
 
 ## 構成
 
