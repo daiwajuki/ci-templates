@@ -76,12 +76,7 @@ on:
         type: string
         default: ''
       build-args:
-        description: |
-          Dockerfile に渡す build-arg（KEY=VALUE 改行区切り、image モードのみ）。
-          機密値は呼び出し側の secrets コンテキストを経由して渡すこと（KEY=$"{{ secrets.X }}" の形式）。
-          例（呼び出し側で実際に書く値）:
-            GH_PACKAGES_TOKEN=<secrets.GITHUB_TOKEN>
-            NEXT_PUBLIC_BASE_URL=https://example.com
+        description: 'Dockerfile に渡す build-arg（KEY=VALUE 改行区切り、image モードのみ）。機密値の渡し方や具体例は docs/usage-deploy-next.md を参照。'
         type: string
         default: ''
       timeout-minutes:
