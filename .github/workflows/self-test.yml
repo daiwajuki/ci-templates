@@ -26,3 +26,27 @@ jobs:
       run-lint: true
       run-typecheck: true
       run-build: true
+
+  test-ci-laravel:
+    name: Test ci-laravel.yml (minimal fixture)
+    needs: lint-workflows
+    uses: ./.github/workflows/ci-laravel.yml
+    with:
+      working-directory: fixtures/minimal-laravel
+      run-pint: false
+      run-tests: false
+      env-from-example: false
+      cache-composer: false
+
+  test-ci-fastapi:
+    name: Test ci-fastapi.yml (minimal fixture)
+    needs: lint-workflows
+    uses: ./.github/workflows/ci-fastapi.yml
+    with:
+      working-directory: fixtures/minimal-fastapi
+      package-manager: pip
+      install-command: 'echo "skip install (self-test fixture)"'
+      extra-test-deps: ''
+      run-ruff: false
+      run-mypy: false
+      run-tests: false

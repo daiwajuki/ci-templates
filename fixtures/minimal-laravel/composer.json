@@ -1,0 +1,12 @@
+{
+  "name": "fixture/minimal-laravel",
+  "description": "ci-laravel.yml self-test fixture (no real deps; exercises PHP setup + composer install plumbing only)",
+  "type": "project",
+  "license": "proprietary",
+  "require": {},
+  "config": {
+    "sort-packages": true
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
