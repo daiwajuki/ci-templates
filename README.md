@@ -66,6 +66,36 @@ _ci-templates/
 | **E** | 残り 13 プロジェクトに横展開・FastAPI / Laravel 用 CI 追加 |
 | **F** | release-please / Renovate 配給・`audit-ci-drift.mjs` 有効化 |
 
+## 採用状況（最終確認: 2026-05-09）
+
+各プロジェクトの `.github/workflows/*.yml` に `daiwajuki/ci-templates` の `uses:` を持つかで実測：
+
+| プロジェクト | 状態 | 備考 |
+|---|---|---|
+| Portal | ✅ 採用済み | Phase B（試験導入） |
+| 残り 13 | ⏳ 未採用 | Phase E で横展開 |
+
+確認コマンド:
+```bash
+grep -rl 'daiwajuki/ci-templates' */.github/workflows/
+```
+
+## 取り込みチェックリスト
+
+1. **workflow 配置**: `.github/workflows/ci.yml` を作成（README 冒頭の YAML サンプル参照）
+2. **ブランチ保護** (任意): GitHub の branch protection rule に `ci / build` を必須チェックとして登録
+3. **secrets 設定**: 必要な GitHub secrets を repo settings に登録（Cloud Run デプロイなら `GCP_SA_KEY` 等。Phase D で WIF に置換予定）
+4. **タグ pin の方針**: `@v0` で floating（推奨）／ `@v0.1.0` で厳密 pin（破壊変更を避けたい場合）
+
+## トラブルシューティング
+
+| 症状 | 原因 | 対処 |
+|---|---|---|
+| `error parsing called workflow` | タグの指定ミス | `@v0` または `@<sha>` で pin、ブランチ名は不可 |
+| Volta セットアップで Node が違う | `package.json` の `volta.node` 未設定 | `volta pin node@20 npm@10` を実行 |
+| `secrets.X` が読めない | reusable workflow への secrets inherit 漏れ | 呼び出し側に `secrets: inherit` を追加 |
+| MAJOR 更新でジョブ落ち | 入力 API 破壊変更 | `CHANGELOG.md` 確認、tag を `@v0` から `@v1` に上げる前に self-test 通す |
+
 ## 関連基盤
 
 - [`_auth`](../_auth/) — 共通認証基盤（`@daiwajuki/auth`）
