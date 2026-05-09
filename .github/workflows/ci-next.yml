@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: daiwajuki/daiwajuki-ci-templates/.github/actions/setup-node-volta@v0
+        uses: daiwajuki/ci-templates/.github/actions/setup-node-volta@v0
         with:
           fallback-version: ${{ inputs.node-version }}
           working-directory: ${{ inputs.working-directory }}

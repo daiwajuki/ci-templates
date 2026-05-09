@@ -1,4 +1,4 @@
-# @daiwajuki/daiwajuki-ci-templates
+# @daiwajuki/ci-templates
 
 大和住器 業務 SaaS 14 プロジェクト共通の GitHub Actions Reusable Workflow / Composite Action / Dockerfile テンプレート基盤。
 
@@ -26,7 +26,7 @@ on:
 
 jobs:
   ci:
-    uses: daiwajuki/daiwajuki-ci-templates/.github/workflows/ci-next.yml@v0
+    uses: daiwajuki/ci-templates/.github/workflows/ci-next.yml@v0
 ```
 
 詳細は [docs/usage-ci-next.md](docs/usage-ci-next.md) 参照。

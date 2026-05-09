@@ -1,12 +1,12 @@
 {
-  "name": "@daiwajuki/daiwajuki-ci-templates",
+  "name": "@daiwajuki/ci-templates",
   "version": "0.1.0",
   "description": "大和住器 業務 SaaS 共通 CI/CD テンプレート",
   "private": true,
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/daiwajuki/daiwajuki-ci-templates.git"
+    "url": "https://github.com/daiwajuki/ci-templates.git"
   },
   "engines": {
     "node": ">=20"

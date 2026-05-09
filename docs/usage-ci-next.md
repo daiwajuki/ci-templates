@@ -12,7 +12,7 @@ on:
 
 jobs:
   ci:
-    uses: daiwajuki/daiwajuki-ci-templates/.github/workflows/ci-next.yml@v0
+    uses: daiwajuki/ci-templates/.github/workflows/ci-next.yml@v0
 ```
 
 ## inputs 一覧
@@ -33,7 +33,7 @@ jobs:
 ```yaml
 jobs:
   ci:
-    uses: daiwajuki/daiwajuki-ci-templates/.github/workflows/ci-next.yml@v0
+    uses: daiwajuki/ci-templates/.github/workflows/ci-next.yml@v0
     with:
       working-directory: web
 ```
@@ -43,7 +43,7 @@ jobs:
 ```yaml
 jobs:
   ci:
-    uses: daiwajuki/daiwajuki-ci-templates/.github/workflows/ci-next.yml@v0
+    uses: daiwajuki/ci-templates/.github/workflows/ci-next.yml@v0
     with:
       build-env-file: .env.ci
     secrets: inherit
@@ -57,7 +57,7 @@ jobs:
 ```yaml
 jobs:
   ci:
-    uses: daiwajuki/daiwajuki-ci-templates/.github/workflows/ci-next.yml@v0
+    uses: daiwajuki/ci-templates/.github/workflows/ci-next.yml@v0
     with:
       run-typecheck: false
       run-build: false
