@@ -1,0 +1,246 @@
+name: Deploy Cloud Run (Next.js)
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: Cloud Run サービス名
+        type: string
+        required: true
+      source-path:
+        description: ソースルート（source モード時のデプロイ対象、image モードで build-context 未指定時のデフォルト）
+        type: string
+        default: './web'
+      region:
+        description: Cloud Run リージョン（指定なしなら vars.GCP_REGION を使用）
+        type: string
+        default: ''
+      build-mode:
+        description: 'ビルド方式: source (Buildpacks) | image (Dockerfile)'
+        type: string
+        default: 'source'
+      ar-repo:
+        description: Artifact Registry リポジトリ名（image モード時に必須）
+        type: string
+        default: ''
+      image-name:
+        description: 'イメージ名（image モード時に必須。例: web）'
+        type: string
+        default: ''
+      dockerfile-path:
+        description: 'Dockerfile への相対パス（build-context 基準）。空なら docker のデフォルト探索'
+        type: string
+        default: ''
+      build-context:
+        description: 'image モード時のビルドコンテキスト。空なら source-path を使用。monorepo で兄弟ディレクトリ参照が必要な場合は "." を指定'
+        type: string
+        default: ''
+      env-vars:
+        description: |
+          Cloud Run に注入する環境変数（KEY1=VALUE1 改行区切り）。
+          deploy-cloudrun の env_vars に渡される。
+        type: string
+        default: ''
+      secrets-yaml:
+        description: Secret Manager 注入定義（KEY=secret-name:version 改行区切り）
+        type: string
+        default: ''
+      smoke-path:
+        description: スモークテスト対象パス
+        type: string
+        default: '/'
+      smoke-expected-statuses:
+        description: スモーク成功と判定する HTTP ステータス（スペース区切り）
+        type: string
+        default: '200 302 307'
+      enable-rollback:
+        description: スモーク失敗時に前リビジョンへ rollback するか
+        type: boolean
+        default: true
+      route-to-latest:
+        description: デプロイ成功時に latest リビジョンへ 100% トラフィックを向けるか
+        type: boolean
+        default: true
+      colocate-repo:
+        description: |
+          ビルド前に sibling パスへ配置する外部リポジトリ（owner/repo 形式）。
+          image モードで _design-system 等を Docker context に含めたい場合に使用。
+        type: string
+        default: ''
+      colocate-ref:
+        description: colocate-repo のチェックアウト ref（タグ・ブランチ・SHA）
+        type: string
+        default: ''
+      colocate-path:
+        description: colocate-repo の配置先（GITHUB_WORKSPACE からの相対パス、例 "_design-system"）
+        type: string
+        default: ''
+      timeout-minutes:
+        description: ジョブのタイムアウト（分）
+        type: number
+        default: 25
+    secrets:
+      colocate-token:
+        description: colocate-repo がプライベートの場合のアクセストークン（未指定時は github.token）
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Build & Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve region
+        id: region
+        run: |
+          R="${{ inputs.region }}"
+          if [ -z "$R" ]; then R="${{ vars.GCP_REGION }}"; fi
+          echo "value=$R" >> $GITHUB_OUTPUT
+
+      - name: Resolve build context
+        id: ctx
+        run: |
+          C="${{ inputs.build-context }}"
+          if [ -z "$C" ]; then C="${{ inputs.source-path }}"; fi
+          echo "value=$C" >> $GITHUB_OUTPUT
+
+      # ─── colocate-repo を build context 配下に配置 ────────────────────────
+      - name: Checkout colocate-repo
+        if: inputs.colocate-repo != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.colocate-repo }}
+          ref: ${{ inputs.colocate-ref }}
+          token: ${{ secrets.colocate-token || github.token }}
+          path: ${{ inputs.colocate-path }}
+
+      - name: Authenticate to GCP (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      # ─── image モード: Dockerfile ビルド & push ──────────────────────────
+      - name: Configure Docker for Artifact Registry
+        if: inputs.build-mode == 'image'
+        run: gcloud auth configure-docker ${{ steps.region.outputs.value }}-docker.pkg.dev --quiet
+
+      - name: Set up Docker Buildx
+        if: inputs.build-mode == 'image'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate image-mode inputs
+        if: inputs.build-mode == 'image'
+        run: |
+          if [ -z "${{ inputs.ar-repo }}" ] || [ -z "${{ inputs.image-name }}" ]; then
+            echo "::error::build-mode=image requires both 'ar-repo' and 'image-name' inputs"
+            exit 1
+          fi
+
+      - name: Compute image refs
+        if: inputs.build-mode == 'image'
+        id: image
+        run: |
+          BASE="${{ steps.region.outputs.value }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ inputs.ar-repo }}/${{ inputs.image-name }}"
+          echo "sha_tag=${BASE}:${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "latest_tag=${BASE}:latest" >> $GITHUB_OUTPUT
+
+      - name: Build and push image
+        if: inputs.build-mode == 'image'
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ steps.ctx.outputs.value }}
+          file: ${{ inputs.dockerfile-path }}
+          push: true
+          tags: |
+            ${{ steps.image.outputs.sha_tag }}
+            ${{ steps.image.outputs.latest_tag }}
+          cache-from: type=gha,scope=${{ inputs.service-name }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.service-name }}
+
+      # ─── デプロイ（source / image 共通） ─────────────────────────────────
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ inputs.service-name }}
+          source: ${{ inputs.build-mode == 'source' && inputs.source-path || '' }}
+          image:  ${{ inputs.build-mode == 'image'  && steps.image.outputs.sha_tag || '' }}
+          region: ${{ steps.region.outputs.value }}
+          env_vars: ${{ inputs.env-vars }}
+          secrets: ${{ inputs.secrets-yaml }}
+
+      - name: Route 100% traffic to latest revision
+        if: inputs.route-to-latest
+        run: |
+          gcloud run services update-traffic "${{ inputs.service-name }}" \
+            --region="${{ steps.region.outputs.value }}" \
+            --to-latest
+
+      # ─── スモークテスト ──────────────────────────────────────────────────
+      - name: Smoke test
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+          PATH_SMOKE: ${{ inputs.smoke-path }}
+          EXPECTED: ${{ inputs.smoke-expected-statuses }}
+        run: |
+          echo "Smoke testing: ${URL}${PATH_SMOKE} (expected: ${EXPECTED})"
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${URL}${PATH_SMOKE}" || echo "000")
+            echo "attempt $i -> HTTP $STATUS"
+            for ok in $EXPECTED; do
+              if [ "$STATUS" = "$ok" ]; then exit 0; fi
+            done
+            sleep 5
+          done
+          echo "::error::Smoke test failed."
+          exit 1
+
+      # ─── 失敗時の rollback ──────────────────────────────────────────────
+      - name: Rollback on failure
+        if: failure() && inputs.enable-rollback
+        run: |
+          echo "::warning::Rolling back ${{ inputs.service-name }} to previous revision"
+          PREV=$(gcloud run revisions list \
+            --service="${{ inputs.service-name }}" \
+            --region="${{ steps.region.outputs.value }}" \
+            --format='value(name)' \
+            --limit=2 | tail -1)
+          if [ -n "$PREV" ]; then
+            gcloud run services update-traffic "${{ inputs.service-name }}" \
+              --region="${{ steps.region.outputs.value }}" \
+              --to-revisions="${PREV}=100"
+            echo "Rolled back to ${PREV}"
+          else
+            echo "::error::No previous revision found for rollback"
+          fi
+
+      - name: Job Summary
+        if: always()
+        run: |
+          {
+            echo "## 🚀 Deploy ${{ inputs.service-name }}"
+            echo ""
+            echo "| 項目 | 値 |"
+            echo "|---|---|"
+            echo "| Service | \`${{ inputs.service-name }}\` |"
+            echo "| Mode | \`${{ inputs.build-mode }}\` |"
+            echo "| Region | \`${{ steps.region.outputs.value }}\` |"
+            echo "| URL | ${{ steps.deploy.outputs.url }} |"
+            echo "| Status | ${{ job.status }} |"
+          } >> $GITHUB_STEP_SUMMARY

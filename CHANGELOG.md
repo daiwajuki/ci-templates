@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0] - 2026-05-09
+
+### Added
+
+- `deploy-cloudrun-next.yml`: Next.js 用 Cloud Run デプロイ Reusable Workflow
+  - `build-mode: source|image` 切替（Buildpacks / Dockerfile）
+  - `colocate-repo` サポート（image モードで `_design-system` 等を Docker context に含める用）
+  - `smoke-path` / `smoke-expected-statuses` で柔軟なスモーク（auth redirect の 302/307 許容デフォルト）
+  - 失敗時 rollback、route-to-latest
+- `docs/usage-deploy-next.md`: 利用ガイド
+
+### Notes
+
+- これで Next.js / Laravel / FastAPI の 3 スタック × CI / Deploy で **6 種の reusable workflow** が揃った
+- 既存呼び出し側に変更不要
+
 ## [0.3.0] - 2026-05-09
 
 ### Added

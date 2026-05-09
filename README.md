@@ -9,6 +9,7 @@
 | Reusable Workflow | `.github/workflows/ci-next.yml` | live 参照（`uses:`） |
 | Reusable Workflow | `.github/workflows/ci-laravel.yml` | live 参照（`uses:`） |
 | Reusable Workflow | `.github/workflows/ci-fastapi.yml` | live 参照（`uses:`） |
+| Reusable Workflow | `.github/workflows/deploy-cloudrun-next.yml` | live 参照（`uses:`） |
 | Reusable Workflow | `.github/workflows/deploy-cloudrun-laravel.yml` | live 参照（`uses:`） |
 | Reusable Workflow | `.github/workflows/deploy-cloudrun-fastapi.yml` | live 参照（`uses:`） |
 | Composite Action | `.github/actions/setup-node-volta/` | live 参照（`uses:`） |
@@ -34,6 +35,19 @@ jobs:
 ```
 
 詳細は [docs/usage-ci-next.md](docs/usage-ci-next.md) 参照。
+
+### Next.js Cloud Run デプロイ
+
+```yaml
+jobs:
+  deploy:
+    uses: daiwajuki/ci-templates/.github/workflows/deploy-cloudrun-next.yml@v0
+    with:
+      service-name: my-web
+      source-path: ./web
+```
+
+詳細は [docs/usage-deploy-next.md](docs/usage-deploy-next.md) 参照。
 
 ### Laravel CI / Cloud Run デプロイ
 
