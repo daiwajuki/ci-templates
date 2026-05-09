@@ -52,6 +52,9 @@ on:
         type: string
         default: ''
     secrets:
+      GH_PACKAGES_TOKEN:
+        description: GitHub Packages 読み取り用トークン（org secret。未指定時は github.token で試行）
+        required: false
       colocate-token:
         description: colocate-repo がプライベートの場合のアクセストークン（未指定時は github.token）
         required: false
@@ -103,7 +106,7 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund
         env:
-          GH_PACKAGES_TOKEN: ${{ github.token }}
+          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || github.token }}
 
       - name: Check scripts
         id: scripts
