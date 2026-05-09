@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.5.0] - 2026-05-09
+
+### Added
+
+- `deploy-cloudrun-next.yml`: `GH_PACKAGES_TOKEN` secret を受け付け（#9）。image モードで `npm ci` が GitHub Packages の private パッケージ（`@daiwajuki/auth` 等）を解決する用途
+- `deploy-cloudrun-next.yml`: `GH_PACKAGES_TOKEN` 未指定時に `secrets.GITHUB_TOKEN` から自動注入（#7）。呼び出し側で明示しなくても same-repo / 同一 owner の private パッケージにアクセス可能
+
+### Fixed
+
+- `deploy-cloudrun-next.yml`: `build-args` input description 内の `${{ }}`-like syntax を完全に剥がして reusable workflow パース失敗を回避（#8）
+
+### Notes
+
+- 既存呼び出し側に変更不要（追加 secret はオプショナル、`GITHUB_TOKEN` フォールバックあり）
+- private パッケージ参照側（`colocate-repo` で `_design-system` を取り込み、その中で GitHub Packages の `@daiwajuki/auth` を `npm ci` するケース等）は `GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}` を呼び出し側に明示すると、cross-owner の private パッケージにもアクセス可能
+- `@v0` floating tag は本リリースを指す
+
+## [0.4.3] - 2026-05-09
+
+### Fixed
+
+- `deploy-cloudrun-next.yml`: `build-args` input description 内の `${{ }}` リテラルが reusable workflow としてパースされる問題を回避するため description をエスケープ（#6）
+
+## [0.4.2] - 2026-05-09
+
+### Added
+
+- `deploy-cloudrun-next.yml`: `build-args` input を追加（#5）。Dockerfile ビルド時の `--build-arg` を改行区切りで複数渡せる（image モードのみ）
+
 ## [0.4.1] - 2026-05-09
 
 ### Fixed
