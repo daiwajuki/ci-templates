@@ -1,0 +1,125 @@
+name: CI (FastAPI / Python)
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: Python バージョン
+        type: string
+        default: '3.12'
+      working-directory:
+        description: Python プロジェクトルート（monorepo の場合に指定）
+        type: string
+        default: '.'
+      package-manager:
+        description: 'パッケージマネージャ: uv | poetry | pip'
+        type: string
+        default: 'uv'
+      install-command:
+        description: |
+          依存インストールコマンドのオーバーライド。
+          空の場合は package-manager のデフォルトを使用：
+            uv     → uv pip install -e . && uv pip install <extra-test-deps>
+            poetry → poetry install --with dev
+            pip    → pip install -e . && pip install <extra-test-deps>
+        type: string
+        default: ''
+      extra-test-deps:
+        description: テスト用追加依存（uv / pip モード時に使用）
+        type: string
+        default: 'pytest pytest-asyncio pytest-cov'
+      test-command:
+        description: テスト実行コマンド
+        type: string
+        default: 'pytest tests/ -v'
+      run-tests:
+        description: テストを実行するか
+        type: boolean
+        default: true
+      run-ruff:
+        description: ruff check を実行するか
+        type: boolean
+        default: false
+      run-mypy:
+        description: mypy を実行するか
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Lint / Test (FastAPI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Setup uv
+        if: inputs.package-manager == 'uv'
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Setup Poetry
+        if: inputs.package-manager == 'poetry'
+        run: pipx install poetry
+
+      - name: Install dependencies (uv)
+        if: inputs.package-manager == 'uv' && inputs.install-command == ''
+        run: |
+          uv venv
+          uv pip install -e .
+          if [ -n "${{ inputs.extra-test-deps }}" ]; then
+            uv pip install ${{ inputs.extra-test-deps }}
+          fi
+
+      - name: Install dependencies (poetry)
+        if: inputs.package-manager == 'poetry' && inputs.install-command == ''
+        run: poetry install --with dev
+
+      - name: Install dependencies (pip)
+        if: inputs.package-manager == 'pip' && inputs.install-command == ''
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -e .
+          if [ -n "${{ inputs.extra-test-deps }}" ]; then
+            .venv/bin/pip install ${{ inputs.extra-test-deps }}
+          fi
+
+      - name: Install dependencies (custom)
+        if: inputs.install-command != ''
+        run: ${{ inputs.install-command }}
+
+      - name: Resolve python runner
+        id: pyrun
+        run: |
+          case "${{ inputs.package-manager }}" in
+            uv)     echo "cmd=.venv/bin/python -m" >> $GITHUB_OUTPUT ;;
+            poetry) echo "cmd=poetry run python -m" >> $GITHUB_OUTPUT ;;
+            pip)    echo "cmd=.venv/bin/python -m" >> $GITHUB_OUTPUT ;;
+          esac
+
+      - name: Lint (ruff)
+        if: inputs.run-ruff
+        run: ${{ steps.pyrun.outputs.cmd }} ruff check .
+
+      - name: Type check (mypy)
+        if: inputs.run-mypy
+        run: ${{ steps.pyrun.outputs.cmd }} mypy .
+
+      - name: Run tests
+        if: inputs.run-tests
+        run: ${{ steps.pyrun.outputs.cmd }} ${{ inputs.test-command }}

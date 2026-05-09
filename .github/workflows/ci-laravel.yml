@@ -1,0 +1,100 @@
+name: CI (Laravel)
+
+on:
+  workflow_call:
+    inputs:
+      php-version:
+        description: PHP バージョン
+        type: string
+        default: '8.4'
+      working-directory:
+        description: Laravel プロジェクトルート（monorepo の場合に指定）
+        type: string
+        default: '.'
+      php-extensions:
+        description: setup-php に渡す拡張モジュール（カンマ区切り）
+        type: string
+        default: 'mbstring, pdo, pdo_pgsql, pdo_sqlite, bcmath'
+      composer-args:
+        description: composer install に渡す追加引数
+        type: string
+        default: '--prefer-dist --no-interaction --no-progress'
+      run-pint:
+        description: Laravel Pint を実行するか（vendor/bin/pint --test）
+        type: boolean
+        default: false
+      run-tests:
+        description: php artisan test を実行するか
+        type: boolean
+        default: true
+      test-args:
+        description: 'php artisan test に渡す追加引数（例: --parallel）'
+        type: string
+        default: ''
+      env-from-example:
+        description: .env.example をコピーして key:generate するか
+        type: boolean
+        default: true
+      cache-composer:
+        description: composer 依存をキャッシュするか
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Lint / Test (Laravel)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+          extensions: ${{ inputs.php-extensions }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Get composer cache directory
+        if: inputs.cache-composer
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache composer dependencies
+        if: inputs.cache-composer
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ inputs.php-version }}-${{ hashFiles(format('{0}/composer.lock', inputs.working-directory)) }}
+          restore-keys: |
+            ${{ runner.os }}-composer-${{ inputs.php-version }}-
+
+      - name: Install dependencies
+        run: composer install ${{ inputs.composer-args }}
+
+      - name: Prepare environment
+        if: inputs.env-from-example
+        run: |
+          if [ -f .env.example ] && [ ! -f .env ]; then
+            cp .env.example .env
+          fi
+          if [ -f .env ]; then
+            php artisan key:generate --force
+          fi
+
+      - name: Lint (Laravel Pint)
+        if: inputs.run-pint
+        run: ./vendor/bin/pint --test
+
+      - name: Run tests
+        if: inputs.run-tests
+        run: php artisan test ${{ inputs.test-args }}

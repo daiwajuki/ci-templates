@@ -1,0 +1,235 @@
+name: Deploy Cloud Run (Laravel)
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: Cloud Run サービス名
+        type: string
+        required: true
+      source-path:
+        description: ソースルート（source モード時のデプロイ対象、image モード時のビルドコンテキスト）
+        type: string
+        default: './api'
+      region:
+        description: Cloud Run リージョン（指定なしなら vars.GCP_REGION を使用）
+        type: string
+        default: ''
+      build-mode:
+        description: 'ビルド方式: source (Buildpacks) | image (Dockerfile)'
+        type: string
+        default: 'source'
+      ar-repo:
+        description: Artifact Registry リポジトリ名（image モード時に必須）
+        type: string
+        default: ''
+      image-name:
+        description: 'イメージ名（image モード時に必須。例: api）'
+        type: string
+        default: ''
+      env-vars:
+        description: |
+          Cloud Run に注入する環境変数（KEY1=VALUE1 改行区切り）。
+          deploy-cloudrun の env_vars に渡される。
+        type: string
+        default: ''
+      secrets-yaml:
+        description: |
+          Secret Manager からの注入定義（KEY=secret-name:version 改行区切り）。
+          例:
+            APP_KEY=icp-cost-hub-app-key:latest
+        type: string
+        default: ''
+      smoke-health-path:
+        description: スモークテストのヘルスエンドポイント（200 期待）
+        type: string
+        default: '/up'
+      smoke-extra-path:
+        description: 追加スモークパス（空文字なら無効）
+        type: string
+        default: ''
+      smoke-extra-expected-status:
+        description: 追加スモークパスの期待 HTTP ステータス
+        type: string
+        default: '302'
+      enable-rollback:
+        description: スモーク失敗時に前リビジョンへ rollback するか
+        type: boolean
+        default: true
+      route-to-latest:
+        description: デプロイ成功時に latest リビジョンへ 100% トラフィックを向けるか
+        type: boolean
+        default: true
+      timeout-minutes:
+        description: ジョブのタイムアウト（分）
+        type: number
+        default: 20
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Build & Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve region
+        id: region
+        run: |
+          R="${{ inputs.region }}"
+          if [ -z "$R" ]; then R="${{ vars.GCP_REGION }}"; fi
+          echo "value=$R" >> $GITHUB_OUTPUT
+
+      - name: Authenticate to GCP (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      # ─── image モード: Dockerfile ビルド & push ──────────────────────────
+      - name: Configure Docker for Artifact Registry
+        if: inputs.build-mode == 'image'
+        run: gcloud auth configure-docker ${{ steps.region.outputs.value }}-docker.pkg.dev --quiet
+
+      - name: Set up Docker Buildx
+        if: inputs.build-mode == 'image'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate image-mode inputs
+        if: inputs.build-mode == 'image'
+        run: |
+          if [ -z "${{ inputs.ar-repo }}" ] || [ -z "${{ inputs.image-name }}" ]; then
+            echo "::error::build-mode=image requires both 'ar-repo' and 'image-name' inputs"
+            exit 1
+          fi
+
+      - name: Compute image refs
+        if: inputs.build-mode == 'image'
+        id: image
+        run: |
+          BASE="${{ steps.region.outputs.value }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ inputs.ar-repo }}/${{ inputs.image-name }}"
+          echo "sha_tag=${BASE}:${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "latest_tag=${BASE}:latest" >> $GITHUB_OUTPUT
+
+      - name: Build and push image
+        if: inputs.build-mode == 'image'
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ inputs.source-path }}
+          push: true
+          tags: |
+            ${{ steps.image.outputs.sha_tag }}
+            ${{ steps.image.outputs.latest_tag }}
+          cache-from: type=gha,scope=${{ inputs.service-name }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.service-name }}
+
+      # ─── デプロイ（source / image 共通） ─────────────────────────────────
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ inputs.service-name }}
+          source: ${{ inputs.build-mode == 'source' && inputs.source-path || '' }}
+          image:  ${{ inputs.build-mode == 'image'  && steps.image.outputs.sha_tag || '' }}
+          region: ${{ steps.region.outputs.value }}
+          env_vars: ${{ inputs.env-vars }}
+          secrets: ${{ inputs.secrets-yaml }}
+
+      - name: Route 100% traffic to latest revision
+        if: inputs.route-to-latest
+        run: |
+          gcloud run services update-traffic "${{ inputs.service-name }}" \
+            --region="${{ steps.region.outputs.value }}" \
+            --to-latest
+
+      # ─── スモークテスト ──────────────────────────────────────────────────
+      - name: Mint OIDC ID token for smoke test
+        id: idtoken
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+          token_format: id_token
+          id_token_audience: ${{ steps.deploy.outputs.url }}
+          id_token_include_email: true
+
+      - name: Smoke test — health
+        env:
+          ID_TOKEN: ${{ steps.idtoken.outputs.id_token }}
+          URL: ${{ steps.deploy.outputs.url }}
+          PATH_HEALTH: ${{ inputs.smoke-health-path }}
+        run: |
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
+              -H "Authorization: Bearer $ID_TOKEN" \
+              "${URL}${PATH_HEALTH}")
+            echo "Health attempt $i (${PATH_HEALTH}): HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then exit 0; fi
+            [ "$i" = "5" ] && echo "::error::Health check failed" && exit 1
+            sleep 5
+          done
+
+      - name: Smoke test — extra path
+        if: inputs.smoke-extra-path != ''
+        env:
+          ID_TOKEN: ${{ steps.idtoken.outputs.id_token }}
+          URL: ${{ steps.deploy.outputs.url }}
+          PATH_EXTRA: ${{ inputs.smoke-extra-path }}
+          EXPECTED: ${{ inputs.smoke-extra-expected-status }}
+        run: |
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $ID_TOKEN" \
+            --max-redirs 0 \
+            "${URL}${PATH_EXTRA}")
+          echo "Extra (${PATH_EXTRA}) HTTP $STATUS (expected ${EXPECTED})"
+          if [ "$STATUS" != "$EXPECTED" ]; then
+            echo "::error::Expected $EXPECTED but got $STATUS"
+            exit 1
+          fi
+
+      # ─── 失敗時の rollback ──────────────────────────────────────────────
+      - name: Rollback on failure
+        if: failure() && inputs.enable-rollback
+        run: |
+          echo "::warning::Smoke test failed. Rolling back ${{ inputs.service-name }}..."
+          PREV=$(gcloud run revisions list \
+            --service="${{ inputs.service-name }}" \
+            --region="${{ steps.region.outputs.value }}" \
+            --format='value(name)' \
+            --limit=2 | tail -1)
+          if [ -n "$PREV" ]; then
+            gcloud run services update-traffic "${{ inputs.service-name }}" \
+              --region="${{ steps.region.outputs.value }}" \
+              --to-revisions="${PREV}=100"
+            echo "Rolled back to ${PREV}"
+          else
+            echo "::error::No previous revision found for rollback"
+          fi
+
+      - name: Job Summary
+        if: always()
+        run: |
+          {
+            echo "## 🚀 Deploy ${{ inputs.service-name }}"
+            echo ""
+            echo "| 項目 | 値 |"
+            echo "|---|---|"
+            echo "| Service | \`${{ inputs.service-name }}\` |"
+            echo "| Mode | \`${{ inputs.build-mode }}\` |"
+            echo "| Region | \`${{ steps.region.outputs.value }}\` |"
+            echo "| URL | ${{ steps.deploy.outputs.url }} |"
+            echo "| Status | ${{ job.status }} |"
+          } >> $GITHUB_STEP_SUMMARY

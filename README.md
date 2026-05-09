@@ -7,6 +7,10 @@
 | 種類 | パス | 配布方式 |
 |---|---|---|
 | Reusable Workflow | `.github/workflows/ci-next.yml` | live 参照（`uses:`） |
+| Reusable Workflow | `.github/workflows/ci-laravel.yml` | live 参照（`uses:`） |
+| Reusable Workflow | `.github/workflows/ci-fastapi.yml` | live 参照（`uses:`） |
+| Reusable Workflow | `.github/workflows/deploy-cloudrun-laravel.yml` | live 参照（`uses:`） |
+| Reusable Workflow | `.github/workflows/deploy-cloudrun-fastapi.yml` | live 参照（`uses:`） |
 | Composite Action | `.github/actions/setup-node-volta/` | live 参照（`uses:`） |
 | Dockerfile テンプレート | `dockerfiles/` | copy 配布（Phase C〜） |
 | docker-compose テンプレート | `docker-compose/` | copy 配布（Phase C〜） |
@@ -30,6 +34,49 @@ jobs:
 ```
 
 詳細は [docs/usage-ci-next.md](docs/usage-ci-next.md) 参照。
+
+### Laravel CI / Cloud Run デプロイ
+
+```yaml
+jobs:
+  api:
+    uses: daiwajuki/ci-templates/.github/workflows/ci-laravel.yml@v0
+    with:
+      working-directory: api
+
+  deploy:
+    needs: api
+    if: github.ref == 'refs/heads/main'
+    uses: daiwajuki/ci-templates/.github/workflows/deploy-cloudrun-laravel.yml@v0
+    with:
+      service-name: my-api
+      source-path: ./api
+      smoke-health-path: /up
+```
+
+詳細は [docs/usage-ci-laravel.md](docs/usage-ci-laravel.md) / [docs/usage-deploy-laravel.md](docs/usage-deploy-laravel.md) 参照。
+
+### FastAPI CI / Cloud Run デプロイ
+
+```yaml
+jobs:
+  test:
+    uses: daiwajuki/ci-templates/.github/workflows/ci-fastapi.yml@v0
+    with:
+      working-directory: server-py
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    uses: daiwajuki/ci-templates/.github/workflows/deploy-cloudrun-fastapi.yml@v0
+    with:
+      service-name: my-api
+      source-path: ./server-py
+      ar-repo: my-project
+      image-name: api
+```
+
+詳細は [docs/usage-ci-fastapi.md](docs/usage-ci-fastapi.md) / [docs/usage-deploy-fastapi.md](docs/usage-deploy-fastapi.md) 参照。
 
 ## バージョニング
 

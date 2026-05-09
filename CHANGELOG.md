@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.0] - 2026-05-09
+
+### Added
+
+- `ci-laravel.yml`: Laravel 用 reusable workflow（PHP setup → composer → optional pint → artisan test）
+  - inputs: `php-version` / `working-directory` / `php-extensions` / `composer-args` / `run-pint` / `run-tests` / `test-args` / `env-from-example` / `cache-composer`
+- `ci-fastapi.yml`: FastAPI / Python 用 reusable workflow（uv / poetry / pip 切替）
+  - inputs: `python-version` / `working-directory` / `package-manager` / `install-command` / `extra-test-deps` / `test-command` / `run-tests` / `run-ruff` / `run-mypy`
+- `deploy-cloudrun-laravel.yml`: Cloud Run デプロイ（`build-mode: source|image` 切替対応）
+  - source モード: Buildpacks（Dockerfile 不要）/ image モード: Dockerfile + buildx
+  - OIDC ID Token によるスモークテスト、追加検証パス対応、失敗時 rollback
+- `deploy-cloudrun-fastapi.yml`: Cloud Run デプロイ（image 固定）
+  - buildx + Artifact Registry push、多パススモーク（順次試行）、失敗時 rollback
+- `docs/usage-ci-laravel.md` / `docs/usage-ci-fastapi.md` / `docs/usage-deploy-laravel.md` / `docs/usage-deploy-fastapi.md`: 各 workflow の利用ガイド
+
+### Notes
+
+- 既存 `ci-next.yml` 呼び出し側に変更不要
+- MINOR バージョン更新のため `@v0` floating tag は本リリースを指す
+- Laravel デプロイは多数派の Buildpacks 方式をデフォルト、Dockerfile 派は `build-mode: image` で同一 workflow 内分岐
+- FastAPI デプロイは現状全プロジェクトが Dockerfile 必須要件（Playwright 等）のため image 固定
+
 ## [0.2.0] - 2026-05-09
 
 ### Added
