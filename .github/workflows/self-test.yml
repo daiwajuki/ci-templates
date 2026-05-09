@@ -45,7 +45,7 @@ jobs:
     with:
       working-directory: fixtures/minimal-fastapi
       package-manager: pip
-      install-command: 'true'
+      install-command: 'echo "skip install (self-test fixture)"'
       extra-test-deps: ''
       run-ruff: false
       run-mypy: false
