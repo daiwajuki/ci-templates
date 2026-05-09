@@ -117,14 +117,14 @@ jobs:
         run: |
           R="${{ inputs.region }}"
           if [ -z "$R" ]; then R="${{ vars.GCP_REGION }}"; fi
-          echo "value=$R" >> $GITHUB_OUTPUT
+          echo "value=$R" >> "$GITHUB_OUTPUT"
 
       - name: Resolve build context
         id: ctx
         run: |
           C="${{ inputs.build-context }}"
           if [ -z "$C" ]; then C="${{ inputs.source-path }}"; fi
-          echo "value=$C" >> $GITHUB_OUTPUT
+          echo "value=$C" >> "$GITHUB_OUTPUT"
 
       # ─── colocate-repo を build context 配下に配置 ────────────────────────
       - name: Checkout colocate-repo
@@ -169,8 +169,8 @@ jobs:
         id: image
         run: |
           BASE="${{ steps.region.outputs.value }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ inputs.ar-repo }}/${{ inputs.image-name }}"
-          echo "sha_tag=${BASE}:${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "latest_tag=${BASE}:latest" >> $GITHUB_OUTPUT
+          echo "sha_tag=${BASE}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "latest_tag=${BASE}:latest" >> "$GITHUB_OUTPUT"
 
       # GitHub Packages 認証用トークンは inputs 経由では redact されるため、
       # workflow 内で secrets.GITHUB_TOKEN を直接展開して build-args に prepend する
@@ -273,4 +273,4 @@ jobs:
             echo "| Region | \`${{ steps.region.outputs.value }}\` |"
             echo "| URL | ${{ steps.deploy.outputs.url }} |"
             echo "| Status | ${{ job.status }} |"
-          } >> $GITHUB_STEP_SUMMARY
+          } >> "$GITHUB_STEP_SUMMARY"

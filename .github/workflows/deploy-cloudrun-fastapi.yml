@@ -73,7 +73,7 @@ jobs:
         run: |
           R="${{ inputs.region }}"
           if [ -z "$R" ]; then R="${{ vars.GCP_REGION }}"; fi
-          echo "value=$R" >> $GITHUB_OUTPUT
+          echo "value=$R" >> "$GITHUB_OUTPUT"
 
       - name: Authenticate to GCP (WIF)
         uses: google-github-actions/auth@v2
@@ -96,8 +96,8 @@ jobs:
         id: image
         run: |
           BASE="${{ steps.region.outputs.value }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ inputs.ar-repo }}/${{ inputs.image-name }}"
-          echo "sha_tag=${BASE}:${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "latest_tag=${BASE}:latest" >> $GITHUB_OUTPUT
+          echo "sha_tag=${BASE}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "latest_tag=${BASE}:latest" >> "$GITHUB_OUTPUT"
 
       - name: Build and push image
         uses: docker/build-push-action@v5
@@ -180,4 +180,4 @@ jobs:
             echo "| Region | \`${{ steps.region.outputs.value }}\` |"
             echo "| URL | ${{ steps.deploy.outputs.url }} |"
             echo "| Status | ${{ job.status }} |"
-          } >> $GITHUB_STEP_SUMMARY
+          } >> "$GITHUB_STEP_SUMMARY"

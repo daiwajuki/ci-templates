@@ -107,9 +107,9 @@ jobs:
         id: pyrun
         run: |
           case "${{ inputs.package-manager }}" in
-            uv)     echo "cmd=.venv/bin/python -m" >> $GITHUB_OUTPUT ;;
-            poetry) echo "cmd=poetry run python -m" >> $GITHUB_OUTPUT ;;
-            pip)    echo "cmd=.venv/bin/python -m" >> $GITHUB_OUTPUT ;;
+            uv)     echo "cmd=.venv/bin/python -m" >> "$GITHUB_OUTPUT" ;;
+            poetry) echo "cmd=poetry run python -m" >> "$GITHUB_OUTPUT" ;;
+            pip)    echo "cmd=.venv/bin/python -m" >> "$GITHUB_OUTPUT" ;;
           esac
 
       - name: Lint (ruff)
