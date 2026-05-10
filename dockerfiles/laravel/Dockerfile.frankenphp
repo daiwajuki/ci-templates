@@ -1,0 +1,73 @@
+# syntax=docker/dockerfile:1.7
+#
+# @daiwajuki/ci-templates - Laravel Production Dockerfile (FrankenPHP)
+# Stack:    Laravel 11+ + PHP 8.4 (FrankenPHP 単一バイナリ)
+# Base:     dunglas/frankenphp:latest-php8.4
+# Port:     8080
+# User:     www-data
+#
+# FrankenPHP は Caddy ベースの単一バイナリ Web サーバ。
+# Nginx + PHP-FPM + Supervisor の 3 役を 1 プロセスでこなす。
+#
+# 採用側は以下のサポートファイルを `docker/` 配下に用意:
+# - docker/Caddyfile           (FrankenPHP の Caddy 設定、:8080 listen)
+
+ARG PHP_VERSION=8.4
+
+# ================================================================
+# Stage 1: composer build (vendor)
+# ================================================================
+FROM composer:2 AS vendor
+WORKDIR /app
+
+COPY composer.json composer.lock ./
+RUN composer install \
+      --no-dev --no-scripts --no-autoloader \
+      --prefer-dist --no-interaction --no-progress
+
+COPY . ./
+RUN composer dump-autoload --optimize --classmap-authoritative \
+ && composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+
+# ================================================================
+# Stage 2: runtime (FrankenPHP)
+# ================================================================
+FROM dunglas/frankenphp:latest-php${PHP_VERSION} AS runtime
+
+ENV TZ=Asia/Tokyo \
+    SERVER_NAME=":8080"
+
+# CUSTOMIZE: 必要な PHP 拡張を install-php-extensions で追加
+RUN install-php-extensions \
+      pdo_pgsql intl bcmath opcache zip gd exif
+
+# OPcache 本番設定（preload は採用側の app/preload.php を用意した場合のみ有効化）
+RUN { \
+        echo 'opcache.enable=1'; \
+        echo 'opcache.memory_consumption=256'; \
+        echo 'opcache.interned_strings_buffer=16'; \
+        echo 'opcache.max_accelerated_files=20000'; \
+        echo 'opcache.validate_timestamps=0'; \
+    } > $PHP_INI_DIR/conf.d/opcache-prod.ini
+
+WORKDIR /app
+
+# vendor ステージから一式コピー
+COPY --from=vendor --chown=www-data:www-data /app /app
+
+# CUSTOMIZE: Caddyfile（採用側で docker/Caddyfile を用意）
+COPY docker/Caddyfile /etc/caddy/Caddyfile
+
+# 権限設定
+RUN chown -R www-data:www-data /app/storage /app/bootstrap/cache \
+ && chmod -R ug+rwX /app/storage /app/bootstrap/cache
+
+USER www-data
+
+EXPOSE 8080
+
+# Cloud Run 用ヘルスチェック
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:8080/up || exit 1
+
+CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]

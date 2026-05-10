@@ -1,0 +1,46 @@
+# @daiwajuki/ci-templates - PostgreSQL + Redis Development docker-compose
+#
+# 用途: ローカル開発用に PostgreSQL 16 + Redis 7 を起動
+# 配布方式: copy 配布（sync-templates.mjs --target=compose --compose-variant=postgres-redis）
+#
+# キャッシュやセッションストアに Redis を使うプロジェクト向け。
+# ports.json で割り当てられた番号を .env で上書きすること。
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      TZ: Asia/Tokyo
+      PGTZ: Asia/Tokyo
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      # CUSTOMIZE: ports.json で割り当てられた Redis ポートを .env で指定
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:
+  redis_data:
