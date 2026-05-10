@@ -110,15 +110,48 @@ jobs:
 _ci-templates/
 ├── .github/
 │   ├── workflows/
-│   │   ├── ci-next.yml          # Next.js CI（lint/typecheck/build）
-│   │   └── self-test.yml        # 自己テスト
+│   │   ├── ci-next.yml                    # Next.js CI（lint/typecheck/build）
+│   │   ├── ci-laravel.yml                 # Laravel CI（pint/test）
+│   │   ├── ci-fastapi.yml                 # FastAPI CI（ruff/mypy/pytest）
+│   │   ├── deploy-cloudrun-next.yml       # Next.js × Cloud Run（WIF）
+│   │   ├── deploy-cloudrun-laravel.yml    # Laravel × Cloud Run（WIF）
+│   │   ├── deploy-cloudrun-fastapi.yml    # FastAPI × Cloud Run（WIF）
+│   │   ├── self-test.yml                  # actionlint + 3 fixture 検証
+│   │   └── release-please.yml             # release PR + v0 floating tag 自動更新
 │   └── actions/
-│       └── setup-node-volta/    # Volta 対応 Node セットアップ
+│       └── setup-node-volta/              # Volta 対応 Node セットアップ
+├── dockerfiles/                           # ★ Phase C: copy 配布
+│   ├── README.md
+│   ├── next/                              # Dockerfile.alpine, Dockerfile.slim
+│   ├── fastapi/                           # Dockerfile.uv, Dockerfile.poetry
+│   └── laravel/                           # Dockerfile.fpm-nginx, Dockerfile.frankenphp
+├── docker-compose/                        # ★ Phase C: copy 配布
+│   ├── README.md
+│   ├── postgres-only.yml
+│   └── postgres-redis.yml
+├── scripts/
+│   └── sync-templates.mjs                 # ★ Phase C: copy 配布の CLI（zero-install）
 ├── docs/
 │   ├── usage-ci-next.md
-│   └── versioning.md
-└── fixtures/
-    └── minimal-next/            # self-test 用フィクスチャ
+│   ├── usage-ci-laravel.md
+│   ├── usage-ci-fastapi.md
+│   ├── usage-deploy-next.md
+│   ├── usage-deploy-laravel.md
+│   ├── usage-deploy-fastapi.md
+│   ├── usage-sync-templates.md            # ★ Phase C: sync-templates CLI 使い方
+│   ├── versioning.md
+│   └── audit-ci-drift-design.md           # Phase F 設計書（実装は未着手）
+├── fixtures/
+│   ├── minimal-next/                      # ci-next.yml self-test 用
+│   ├── minimal-laravel/                   # ci-laravel.yml self-test 用
+│   └── minimal-fastapi/                   # ci-fastapi.yml self-test 用
+├── release-please-config.json             # bump-minor-pre-major: true
+├── .release-please-manifest.json          # 現バージョン正本（手動編集禁止）
+├── CHANGELOG.md                           # release-please が自動生成
+├── CLAUDE.md                              # 編集者向け運用ルール
+├── LICENSE
+├── README.md
+└── package.json                           # metadata のみ（ローカルビルド無し）
 ```
 
 ## ロードマップ
@@ -127,14 +160,14 @@ _ci-templates/
 |---|---|---|
 | **A** | リポジトリ初期化・`ci-next.yml` 公開 | ✅ 完了 |
 | **B** | Portal で試験導入・deploy-cloudrun-next.yml 追加 | ✅ 完了 |
-| **C** | Dockerfile / docker-compose の copy 配布・`sync-templates.mjs` | ⏳ 未着手 |
-| **D** | Workload Identity Federation composite action・JSON キー廃止 | ⏳ 未着手 |
-| **E** | 残り 10 プロジェクトに横展開・FastAPI / Laravel 用 CI 追加 | 🚧 進行中（4/14 採用、CI/Deploy 6 種公開済み） |
-| **F** | release-please / Renovate 配給・`audit-ci-drift.mjs` 有効化 | 🚧 進行中（release-please 完了、audit-ci-drift は [設計済み](docs/audit-ci-drift-design.md)） |
+| **C** | Dockerfile / docker-compose の copy 配布・`sync-templates.mjs` | ✅ 実装完了（Dockerfile 6 種 + compose 2 種 + sync-templates CLI、[docs/usage-sync-templates.md](docs/usage-sync-templates.md) 参照） |
+| **D** | Workload Identity Federation composite action・JSON キー廃止 | ✅ 完了（`deploy-cloudrun-*.yml` で WIF 実装済み・JSON キー回帰なし） |
+| **E** | 残り 12 プロジェクトに横展開・FastAPI / Laravel 用 CI 追加 | 🚧 進行中（6/18 採用、CI/Deploy 6 種公開済み） |
+| **F** | release-please / Renovate 配給・`audit-ci-drift.mjs` 有効化 | 🚧 進行中（release-please 完了、audit-ci-drift は [設計済み](docs/audit-ci-drift-design.md)、Renovate 配給方式は未定） |
 
-## 採用状況（最終確認: 2026-05-09）
+## 採用状況（最終確認: 2026-05-10）
 
-各プロジェクトの `.github/workflows/*.yml` に `daiwajuki/ci-templates` の `uses:` を持つかで実測：
+各プロジェクトの `.github/workflows/*.yml` に `daiwajuki/ci-templates` の `uses:` を持つかで実測（全 18 プロジェクト中 6 件採用）：
 
 | プロジェクト | 状態 | 採用 workflow | 備考 |
 |---|---|---|---|
@@ -142,7 +175,9 @@ _ci-templates/
 | ICPCostHub | ✅ 採用済み | ci.yml, deploy-api.yml, deploy-web.yml | Phase E 横展開 |
 | ICPEstimating | ✅ 採用済み | deploy-api.yml, deploy-web.yml | Phase E 横展開（CI は別途） |
 | PayrollManager | ✅ 採用済み | ci.yml | Phase E 横展開 |
-| 残り 10 | ⏳ 未採用 | — | Phase E で順次横展開 |
+| BidFlow | ✅ 採用済み | （要確認） | Phase E 横展開 |
+| HydraulicCalculation | ✅ 採用済み | （要確認） | Phase E 横展開 |
+| 残り 12 | ⏳ 未採用 | — | Phase E で順次横展開（BidCalc / BuildDeck / CompanyWebsite / ContractHub / DailyLogs / genba-chosa / ICPBlankMap / ICPContacts / ICPForms / ICPSitePhotos / Orders / StridePlan） |
 
 確認コマンド:
 ```bash
