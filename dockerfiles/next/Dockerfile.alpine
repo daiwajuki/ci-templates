@@ -1,0 +1,74 @@
+# syntax=docker/dockerfile:1.7
+#
+# @daiwajuki/ci-templates - Next.js Production Dockerfile (Alpine)
+# Stack:    Next.js 14+ (App Router) + Node.js 20 LTS
+# Base:     node:20-alpine (~50MB)
+# Output:   standalone (server.js + minimal node_modules)
+# Port:     8080 (Cloud Run convention)
+# User:     non-root (nextjs:nodejs, uid/gid 1001)
+#
+# このファイルは sync-templates.mjs から配布されます。
+# `# CUSTOMIZE:` 以外の箇所は template 更新で上書きされる可能性があります。
+
+# ================================================================
+# Stage 1: deps - 依存関係のキャッシュ可能なインストール
+# ================================================================
+FROM node:20-alpine AS deps
+WORKDIR /app
+
+# CUSTOMIZE: GitHub Packages の @daiwajuki/* を使う場合 ARG を渡す
+# Cloud Build / GitHub Actions から --build-arg GH_PACKAGES_TOKEN=$TOKEN
+ARG GH_PACKAGES_TOKEN=""
+ENV GH_PACKAGES_TOKEN=${GH_PACKAGES_TOKEN}
+
+# CUSTOMIZE: .npmrc を持たないプロジェクトは末尾の .npmrc* を削除
+COPY package.json package-lock.json* .npmrc* ./
+
+# CUSTOMIZE: peer dep 競合がある場合は --legacy-peer-deps を追加
+RUN npm ci --no-fund --no-audit
+
+# ================================================================
+# Stage 2: builder - Next.js のビルド (standalone output)
+# ================================================================
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# CUSTOMIZE: build 時に静的解析される env はダミー値を渡す
+# (実行時値は Cloud Run の env / Secret Manager から注入)
+# ENV DATABASE_URL="postgresql://build:build@localhost:5432/build_dummy"
+# ENV AUTH_SECRET="dummy_build_time_secret_replaced_at_runtime_xxxxxxxxxxxxxxxx"
+
+RUN npm run build
+
+# ================================================================
+# Stage 3: runner - 最小ランタイム
+# ================================================================
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=8080
+ENV HOSTNAME=0.0.0.0
+# 締め日基準の業務ロジックが UTC で 1 日ズレるのを防ぐ
+ENV TZ=Asia/Tokyo
+
+# 非 root ユーザー (Cloud Run / OWASP 推奨)
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# next.config.js で `output: 'standalone'` 設定が必要
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+USER nextjs
+
+EXPOSE 8080
+
+CMD ["node", "server.js"]

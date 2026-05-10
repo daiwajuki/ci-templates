@@ -1,0 +1,85 @@
+# syntax=docker/dockerfile:1.7
+#
+# @daiwajuki/ci-templates - Laravel Production Dockerfile (PHP-FPM + Nginx)
+# Stack:    Laravel 11+ + PHP 8.4 (FPM) + Nginx + Supervisor
+# Base:     php:8.4-fpm-alpine
+# Port:     8080 (Cloud Run convention)
+# User:     www-data (non-root)
+#
+# 採用側は以下のサポートファイルを `docker/` 配下に用意する必要があります:
+# - docker/php.ini             (OPcache 等の追加設定)
+# - docker/www.conf            (PHP-FPM プール設定)
+# - docker/nginx.conf          (port 8080 listen)
+# - docker/supervisord.conf    (php-fpm + nginx を起動)
+# - docker/entrypoint.sh       (migrate / cache 等の起動時処理)
+
+ARG PHP_VERSION=8.4
+
+# ================================================================
+# Stage 1: composer build (vendor)
+# ================================================================
+FROM composer:2 AS vendor
+WORKDIR /app
+
+# 依存解決を先にして Docker キャッシュ効率を上げる
+COPY composer.json composer.lock ./
+RUN composer install \
+      --no-dev --no-scripts --no-autoloader \
+      --prefer-dist --no-interaction --no-progress
+
+# アプリ本体をコピーしてオートロード再生成
+COPY . ./
+RUN composer dump-autoload --optimize --classmap-authoritative \
+ && composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+
+# ================================================================
+# Stage 2: runtime
+# ================================================================
+FROM php:${PHP_VERSION}-fpm-alpine AS runtime
+
+# CUSTOMIZE: 不要な PHP 拡張は削除可（gd, exif, intl 等）
+RUN apk add --no-cache \
+      nginx supervisor \
+      postgresql-libs icu-libs libzip oniguruma \
+      libpng libjpeg-turbo freetype \
+      bash tzdata curl \
+ && apk add --no-cache --virtual .build-deps \
+      ${PHPIZE_DEPS} \
+      postgresql-dev icu-dev libzip-dev oniguruma-dev \
+      libpng-dev libjpeg-turbo-dev freetype-dev \
+ && docker-php-ext-configure gd --with-jpeg --with-freetype \
+ && docker-php-ext-install -j$(nproc) \
+      pdo pdo_pgsql bcmath intl opcache gd zip exif \
+ && apk del .build-deps \
+ && cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
+ && rm -rf /var/cache/apk/* /tmp/*
+
+ENV TZ=Asia/Tokyo
+
+WORKDIR /var/www/html
+
+# vendor ステージから一式コピー
+COPY --from=vendor /app /var/www/html
+
+# 設定ファイル群（採用側で docker/ に配置）
+COPY docker/php.ini          $PHP_INI_DIR/conf.d/zz-app.ini
+COPY docker/www.conf         /usr/local/etc/php-fpm.d/www.conf
+COPY docker/nginx.conf       /etc/nginx/nginx.conf
+COPY docker/supervisord.conf /etc/supervisord.conf
+COPY docker/entrypoint.sh    /usr/local/bin/entrypoint.sh
+
+# 権限設定（storage / bootstrap/cache を www-data 書き込み可へ）
+RUN chown -R www-data:www-data storage bootstrap/cache \
+ && chmod -R ug+rwX storage bootstrap/cache \
+ && chmod +x /usr/local/bin/entrypoint.sh \
+ && mkdir -p /run/nginx \
+ && chown -R www-data:www-data /run/nginx
+
+EXPOSE 8080
+
+# Cloud Run 用ヘルスチェック（Laravel 11+ の /up health endpoint）
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:8080/up || exit 1
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["supervisord", "-c", "/etc/supervisord.conf"]

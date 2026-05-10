@@ -1,0 +1,35 @@
+# @daiwajuki/ci-templates - PostgreSQL Development docker-compose
+#
+# 用途: ローカル開発用に PostgreSQL 16 単体を起動
+# 配布方式: copy 配布（sync-templates.mjs --target=compose --compose-variant=postgres-only）
+#
+# 起動: docker compose up -d
+# 停止: docker compose down
+# データ永続化: pgdata named volume
+#
+# ports.json で割り当てられた番号を .env で上書きすること（自動フォールバック禁止）
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      # CUSTOMIZE: プロジェクト固有の DB 名 / ユーザー / パスワード
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      TZ: Asia/Tokyo
+      PGTZ: Asia/Tokyo
+    ports:
+      # CUSTOMIZE: scripts/ports.json で割り当てられた番号（5433-5442 帯）を .env で指定
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

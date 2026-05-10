@@ -1,0 +1,74 @@
+# syntax=docker/dockerfile:1.7
+#
+# @daiwajuki/ci-templates - FastAPI Production Dockerfile (Poetry)
+# Stack:    FastAPI + Python 3.12+ (Poetry 管理)
+# Base:     python:3.12-slim
+# Manager:  Poetry
+# Port:     8080
+# User:     non-root (app:app, uid/gid 1001)
+#
+# 既存 Poetry プロジェクトの移行コスト削減用。新規は Dockerfile.uv 推奨。
+
+# ================================================================
+# Stage 1: builder - Poetry で venv をプロジェクト内に作る
+# ================================================================
+FROM python:3.12-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    POETRY_NO_INTERACTION=1 \
+    POETRY_VIRTUALENVS_CREATE=true \
+    POETRY_VIRTUALENVS_IN_PROJECT=true \
+    POETRY_CACHE_DIR=/tmp/poetry_cache
+
+# CUSTOMIZE: build deps が必要な場合（C 拡張等）
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#       build-essential \
+#  && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir poetry
+
+WORKDIR /app
+COPY pyproject.toml poetry.lock* ./
+RUN poetry install --no-root --only main \
+ && rm -rf $POETRY_CACHE_DIR
+
+# ================================================================
+# Stage 2: runtime - venv をコピーして起動
+# ================================================================
+FROM python:3.12-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/app/.venv/bin:$PATH" \
+    TZ=Asia/Tokyo
+
+# CUSTOMIZE: 実行時に必要な OS パッケージ
+# 例 (BidFlow パターン: playwright + 日本語フォント):
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#       fonts-noto-cjk \
+#  && playwright install --with-deps chromium \
+#  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /app/.venv /app/.venv
+
+# CUSTOMIZE: アプリケーションコードの場所
+COPY app/ ./app/
+
+# 非 root ユーザー
+RUN groupadd --system --gid 1001 app && \
+    useradd --system --uid 1001 --gid app --shell /sbin/nologin app && \
+    chown -R app:app /app
+
+USER app
+
+# CUSTOMIZE: health endpoint パス
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health').read()" || exit 1
+
+ENV PORT=8080
+EXPOSE 8080
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
