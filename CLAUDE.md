@@ -58,6 +58,17 @@ GitHub Actions の制約。`colocate-token` は **空文字に評価される** 
 
 採用側は `@v0` を pin している。SHA は **release-please が動かす前提**。手動で動かさない。途中で repo を作り直したり tag を消したりすると採用側全部の CI が壊れる。
 
+### GitHub Packages cross-repo 認証は org secret `GH_PACKAGES_TOKEN` が前提
+
+`@daiwajuki/auth` や `@daiwajuki/ui-design` のような **publish 元と install 元が別リポジトリ** の private package は、GitHub Actions の `github.token` / `secrets.GITHUB_TOKEN` では **403 になる**（`packages: read` permission を付けても解決しない、これは GitHub Packages の仕様）。
+
+解決構造：
+1. org `daiwajuki` レベルに **`GH_PACKAGES_TOKEN`** secret（`read:packages` 権限の PAT、All repositories アクセス）を 1 個用意
+2. reusable workflow 側は `secrets.GH_PACKAGES_TOKEN || github.token` でフォールバック（same-repo は github.token で動くため）
+3. **採用側は `secrets: inherit`** を必ず付ける（これがないと org secret が reusable workflow に届かない）
+
+採用側 README / docs に「`secrets: inherit` 必須」を必ず明記する。過去事例: Portal CI が 5 連続失敗（v0.5.0 リリース時の 0.4.x 系試行錯誤）。
+
 ## ファイル構造の要点
 
 ### 提供物の配布方式 2 種
@@ -107,4 +118,5 @@ deploy 系は actionlint だけで保護されている。本物の deploy 検�
 | バグ修正（呼び出し側に変更を強いない） | `fix:` でコミット → PATCH bump |
 | docs / 内部リファクタ | `docs:` / `refactor:` でコミット → リリース発火しない |
 | 採用側に Breaking を能動通知したい | [docs/audit-ci-drift-design.md](docs/audit-ci-drift-design.md) 参照（未実装、設計のみ） |
-| ローカルで actionlint を試したい | 現状ローカル実行手段なし。PR を出して self-test の `lint-workflows` ジョブで確認する |
+| ローカルで actionlint を試したい | Docker があれば self-test と同じコマンドが使える: `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color -shellcheck "shellcheck -S warning"` |
+| 新 fixture を追加する | 最小構成は `fixtures/minimal-next/package.json` 参考（`scripts.lint = "echo 'lint ok'"` のようなダミーで OK）。CI 通過の事実だけ確認すれば良い |
