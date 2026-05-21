@@ -1,0 +1,110 @@
+name: Lint Commit Author
+
+# 採用側 (governance-plan v3 Wave 0 ステップ 7) で reusable workflow として呼ぶ。
+# PR の新規 commit (base..HEAD) のみチェックし、過去 commit には触れない。
+# テスト用メール (@example.com 等) の author を CI で拒否することで、
+# 将来の commit を企業メールに正規化する。
+
+on:
+  workflow_call:
+    inputs:
+      forbidden-patterns:
+        description: |
+          禁止する author email のパターン (extended regex、`|` で結合)。
+          デフォルトは過去判明したテスト用メール 3 種を拒否。
+        type: string
+        default: '@example\.com|antigravity@|dev@icp\.com'
+      allowed-domains:
+        description: |
+          許可するドメイン (extended regex、未指定なら domain チェックは行わない)。
+          例: '@daiwajuki\.co\.jp|@users\.noreply\.github\.com'
+        type: string
+        default: ''
+
+jobs:
+  lint-author:
+    name: Verify commit author emails
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check author emails in PR commits
+        env:
+          FORBIDDEN_PATTERNS: ${{ inputs.forbidden-patterns }}
+          ALLOWED_DOMAINS: ${{ inputs.allowed-domains }}
+        run: |
+          set -euo pipefail
+
+          BASE_REF="origin/${{ github.base_ref }}"
+
+          echo "🔍 Checking commits in range: $BASE_REF..HEAD"
+          echo "🚫 Forbidden patterns: $FORBIDDEN_PATTERNS"
+          if [ -n "$ALLOWED_DOMAINS" ]; then
+            echo "✅ Allowed domains: $ALLOWED_DOMAINS"
+          fi
+          echo ""
+
+          # 1. 禁止パターン検出
+          BAD_FORBIDDEN=$(git log "$BASE_REF..HEAD" --pretty=format:'%h %ae' \
+            | grep -E " ($FORBIDDEN_PATTERNS)" || true)
+
+          # 2. 許可ドメイン以外を検出（allowed-domains が指定された場合のみ）
+          BAD_NOT_ALLOWED=""
+          if [ -n "$ALLOWED_DOMAINS" ]; then
+            BAD_NOT_ALLOWED=$(git log "$BASE_REF..HEAD" --pretty=format:'%h %ae' \
+              | grep -vE " ($ALLOWED_DOMAINS)$" \
+              | grep -vE "^$" || true)
+          fi
+
+          # 結果集約
+          if [ -n "$BAD_FORBIDDEN" ] || [ -n "$BAD_NOT_ALLOWED" ]; then
+            {
+              echo "## ❌ Commit author email 違反"
+              echo ""
+              if [ -n "$BAD_FORBIDDEN" ]; then
+                echo "### 禁止パターンに該当する commit"
+                echo ""
+                echo '```'
+                echo "$BAD_FORBIDDEN"
+                echo '```'
+                echo ""
+              fi
+              if [ -n "$BAD_NOT_ALLOWED" ]; then
+                echo "### 許可ドメイン外の commit"
+                echo ""
+                echo '```'
+                echo "$BAD_NOT_ALLOWED"
+                echo '```'
+                echo ""
+              fi
+              echo "### 対応方法"
+              echo ""
+              echo "1. ローカル git config を企業メールに修正:"
+              echo '   ```bash'
+              echo "   git config --global user.email r-taniguchi@daiwajuki.co.jp"
+              echo "   git config --global user.name r-taniguchi"
+              echo '   ```'
+              echo ""
+              echo "2. 該当 commit を企業メールで作り直す:"
+              echo '   ```bash'
+              echo "   git rebase -i <base-ref>  # 該当 commit を edit に変更"
+              echo "   git commit --amend --reset-author --no-edit"
+              echo "   git rebase --continue"
+              echo "   git push --force-with-lease"
+              echo '   ```'
+              echo ""
+              echo "3. 詳細は \`_ci-templates/docs/secrets.md\` を参照"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "✅ All commits in this PR have approved author emails"
+          {
+            echo "## ✅ Commit author email チェック OK"
+            echo ""
+            echo "PR の全 commit が許可された author email を使用しています。"
+          } >> "$GITHUB_STEP_SUMMARY"

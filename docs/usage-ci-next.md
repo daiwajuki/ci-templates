@@ -87,7 +87,7 @@ jobs:
   ci:
     uses: daiwajuki/ci-templates/.github/workflows/ci-next.yml@v0
     with:
-      colocate-repo: r-taniguchi-daiwajuki/_design-system
+      colocate-repo: daiwajuki/daiwajuki-UIdesign
       colocate-ref: v1.11.0
       colocate-path: ../_design-system
     secrets:
