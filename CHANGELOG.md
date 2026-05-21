@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.6.0](https://github.com/daiwajuki/ci-templates/compare/v0.5.1...v0.6.0) (2026-05-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* deploy-cloudrun-next.yml の採用側 secrets ブロックで colocate-token を COLOCATE_TOKEN にリネームが必要。
+
+### Added
+
+* governance v3 Wave A/D/E (BREAKING: colocate-token rename) ([#20](https://github.com/daiwajuki/ci-templates/issues/20)) ([0debb27](https://github.com/daiwajuki/ci-templates/commit/0debb27c8f3032c22e37db012832d6fe60ca2aef))
+
 ## [0.5.1](https://github.com/daiwajuki/ci-templates/compare/v0.5.0...v0.5.1) (2026-05-09)
 
 
