@@ -46,14 +46,14 @@ jobs:
       dockerfile-path: web/Dockerfile
       ar-repo: bidflow
       image-name: web
-      colocate-repo: r-taniguchi-daiwajuki/_design-system
+      colocate-repo: daiwajuki/daiwajuki-UIdesign
       colocate-ref: v1.12.0
       colocate-path: _design-system
       env-vars: |
         INTERNAL_API_BASE_URL=https://bidflow-api-501453986862.asia-northeast1.run.app
         INTERNAL_API_TOKEN=${{ secrets.INTERNAL_API_TOKEN }}
     secrets:
-      colocate-token: ${{ secrets.DS_REPO_TOKEN }}
+      COLOCATE_TOKEN: ${{ secrets.DS_REPO_TOKEN }}
 ```
 
 ## inputs 一覧
@@ -83,7 +83,7 @@ jobs:
 
 | secret | 必須 | 説明 |
 |---|---|---|
-| `colocate-token` | 任意 | colocate-repo がプライベートの場合の PAT。未指定時は `github.token` |
+| `COLOCATE_TOKEN` | 任意 | colocate-repo がプライベートの場合の PAT。未指定時は `github.token`。**v0.6.0 で `colocate-token` から rename**（GitHub Actions secret 名にハイフン不可のため） |
 | `GH_PACKAGES_TOKEN` | 任意 | GitHub Packages の private dependency を取得するためのトークン (例: `@daiwajuki/ui-design`)。未指定時は `secrets.GITHUB_TOKEN` に自動フォールバック (同 owner の package まで読める)。詳細は下記「GitHub Packages 経由の private dependency」を参照 |
 
 ## なぜ smoke で 200/302/307 を許容するか
