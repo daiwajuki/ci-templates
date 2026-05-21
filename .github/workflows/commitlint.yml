@@ -1,0 +1,92 @@
+name: Commitlint (reusable)
+
+# Conventional Commits 規約を PR の各 commit に強制する reusable workflow。
+# governance-plan v3 Wave B ステップ 13 で _ci-templates の中央配給として作成。
+# 3 共通基盤 (_auth / _design-system / _ci-templates) の CI で必須化する。
+#
+# 採用側 (_auth / _design-system) 内の .github/workflows/lint.yml 等から
+#   uses: daiwajuki/ci-templates/.github/workflows/commitlint.yml@v0
+# で参照する。
+#
+# Conventional Commits 形式:
+#   feat: ...        # MINOR bump
+#   fix: ...         # PATCH bump
+#   feat!: ...       # MAJOR bump (v0.x では MINOR)
+#   docs: / chore: / ci: / test: / refactor: / style: / perf: / revert:
+#   scope は任意: feat(scope): ...
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node.js version
+        type: string
+        default: "20"
+      base-ref:
+        description: |
+          検証対象の commit range の base。
+          通常は github.base_ref (PR 時)、push 時は前回 release tag を渡す。
+          未指定時は github.base_ref を使う。
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  commitlint:
+    name: Lint conventional commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install commitlint
+        run: |
+          npm install --no-save --no-package-lock \
+            @commitlint/cli@^19 \
+            @commitlint/config-conventional@^19
+
+      - name: Resolve base ref
+        id: base
+        env:
+          INPUT_BASE: ${{ inputs.base-ref }}
+          DEFAULT_BASE: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ -n "$INPUT_BASE" ]; then
+            echo "ref=$INPUT_BASE" >> "$GITHUB_OUTPUT"
+          elif [ -n "$DEFAULT_BASE" ]; then
+            echo "ref=origin/$DEFAULT_BASE" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::base-ref が指定されておらず github.base_ref も空です"
+            exit 1
+          fi
+
+      - name: Write commitlint config
+        run: |
+          cat > commitlint.config.cjs <<'EOF'
+          module.exports = {
+            extends: ["@commitlint/config-conventional"],
+            rules: {
+              "header-max-length": [2, "always", 120],
+              "body-max-line-length": [0],
+              "footer-max-line-length": [0],
+            },
+          };
+          EOF
+
+      - name: Lint commits in range
+        env:
+          BASE_REF: ${{ steps.base.outputs.ref }}
+        run: |
+          set -euo pipefail
+          echo "Linting commits in range: $BASE_REF..HEAD"
+          npx commitlint --from "$BASE_REF" --to HEAD --verbose
