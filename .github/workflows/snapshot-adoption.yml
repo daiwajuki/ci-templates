@@ -1,0 +1,55 @@
+name: Snapshot Adoption (nightly)
+
+# 14 プロジェクトの @daiwajuki/* 採用バージョンを集計し、
+# Step Summary に Markdown 表として表示。JSON は Artifact として保存。
+# governance-plan v3 Wave D ステップ 19。
+
+on:
+  schedule:
+    - cron: '0 21 * * *'   # 毎日 06:00 JST (21:00 UTC)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    name: Build adoption snapshot
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout _ci-templates
+        uses: actions/checkout@v4
+
+      - name: Checkout scripts/projects-meta.json (workspace-level)
+        # 注: projects-meta.json はワークスペース直下にあるため、別途 fetch する必要あり。
+        # 暫定: _ci-templates リポに sync copy を置く (Wave D 実装時に決定)、
+        # または gh api で daiwajuki/workspace-config 等の専用リポから取得。
+        # ここでは _ci-templates 内に projects-meta.json のコピーがある前提で進める。
+        run: |
+          if [ ! -f scripts/projects-meta.json ]; then
+            echo "::warning::scripts/projects-meta.json not found in _ci-templates."
+            echo "::warning::Wave D 実装時に projects-meta.json の同期方式を確定する必要あり。"
+            exit 0
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build adoption snapshot
+        env:
+          GH_TOKEN: ${{ secrets.ADOPTER_NOTIFY_TOKEN || github.token }}
+        run: |
+          mkdir -p .artifacts
+          node scripts/build-adoption-snapshot.mjs --remote --json-out=.artifacts/adoption-snapshot.json
+
+      - name: Upload snapshot JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adoption-snapshot-${{ github.run_id }}
+          path: .artifacts/adoption-snapshot.json
+          retention-days: 30
