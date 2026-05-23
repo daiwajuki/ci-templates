@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0](https://github.com/daiwajuki/ci-templates/compare/v0.6.0...v0.7.0) (2026-05-23)
+
+
+### Added
+
+* **deploy-laravel:** add additional-build-context-repos for BuildKit cross-repo contexts ([#22](https://github.com/daiwajuki/ci-templates/issues/22)) ([1d992a4](https://github.com/daiwajuki/ci-templates/commit/1d992a40b9b2df1fafd3452669bb95ea01c01bf2))
+* **deploy-laravel:** GitHub App credentials for cross-repo checkout token ([#24](https://github.com/daiwajuki/ci-templates/issues/24)) ([eafc028](https://github.com/daiwajuki/ci-templates/commit/eafc028d60c96fe5e486f73edc4078091f0a7802))
+
 ## [0.6.0](https://github.com/daiwajuki/ci-templates/compare/v0.5.1...v0.6.0) (2026-05-21)
 
 
