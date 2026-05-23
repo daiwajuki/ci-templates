@@ -54,19 +54,34 @@ React 19 / Next.js 16 を採用しているプロジェクト（Portal / StrideP
 
 ### Step 1: 全プロジェクト dry-run
 
-```bash
-# scripts/show-legacy-peer-deps-status.mjs（Wave E 実装、未着手）の想定:
-# 各プロジェクトで legacy-peer-deps=false 相当の install を試行し、失敗箇所を集計
+`_ci-templates` に集計スクリプトを用意済み:
 
-for project in $(node -e "console.log(Object.keys(require('./scripts/projects-meta.json')).join(' '))"); do
-  if [ -d "$project" ]; then
-    cd "$project"
-    # 一時的に legacy を無効化
-    npm install --no-legacy-peer-deps --dry-run 2>&1 | tee "../audit-peer-deps-${project}.log"
-    cd ..
-  fi
-done
+```bash
+# 全 active プロジェクトを巡回 (デフォルト 120s/project)
+node scripts/show-legacy-peer-deps-status.mjs
+
+# 結果を docs/peer-deps-status.md に書き出す (PR 添付用)
+node scripts/show-legacy-peer-deps-status.mjs --write
+
+# 部分実行
+node scripts/show-legacy-peer-deps-status.mjs --projects=Portal,ICPCostHub --timeout=180
 ```
+
+出力例:
+
+```
+Project                  Status  Exit  ERESOLVE  warns  Notes
+─────────────────────────────────────────────────────────────────
+Portal                   ✅ pass     0         0      0
+ICPCostHub               ⚠️ warn     0         0      3
+PayrollManager           ❌ fail     1         2      0
+ICPSitePhotos            ⏭️ skip    —         —      —  no package.json
+```
+
+判定基準:
+- **pass**: exit=0 + warn=0 → `.npmrc` から legacy 撤去 OK
+- **warn**: exit=0 + warn>0 → 撤去可だが将来 `overrides` か peer 範囲拡張で警告ゼロを目指す
+- **fail**: exit≠0 → 下の Step 3 の対応表に従って fix が必要
 
 ### Step 2: 通るプロジェクトから順次撤去
 
