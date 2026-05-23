@@ -1,0 +1,222 @@
+name: Notify adopters of new release
+
+# ───────────────────────────────────────────────────────────────────────────────
+# `@v0` floating tag を pin している採用側 (.github/adopters.json) に対し、
+# 新リリースが降ったことを Issue 投稿で通知する。
+#
+# 設計: docs/audit-ci-drift-design.md (案 A: Push 通知)
+# 必要 secret: ADOPTER_NOTIFY_TOKEN (issues: write × adopter repos)
+#
+# 通常運用:
+#   release: published で自動発火 (draft / prerelease は除外)
+# 手動テスト:
+#   workflow_dispatch で release_tag 指定 + dry-run=true → Issue 作成せず ログのみ
+# ───────────────────────────────────────────────────────────────────────────────
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'テスト用に通知するリリースタグ (例: v0.6.0)。空なら latest。'
+        type: string
+        default: ''
+      dry_run:
+        description: 'true なら Issue 作成せずログ出力のみ'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    name: Open notification issue in each adopter
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (!github.event.release.draft && !github.event.release.prerelease && github.event.release.tag_name != 'v0')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve release metadata
+        id: rel
+        env:
+          # release イベント時はイベントから、workflow_dispatch 時は input or latest から
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          EVENT_URL: ${{ github.event.release.html_url }}
+          EVENT_BODY: ${{ github.event.release.body }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "release" ]; then
+            TAG="$EVENT_TAG"
+            URL="$EVENT_URL"
+            BODY="$EVENT_BODY"
+          else
+            # workflow_dispatch: input か latest を取りに行く
+            if [ -n "$INPUT_TAG" ]; then
+              TAG="$INPUT_TAG"
+            else
+              TAG=$(gh release view --repo "${{ github.repository }}" --json tagName -q .tagName)
+            fi
+            URL=$(gh release view "$TAG" --repo "${{ github.repository }}" --json url -q .url)
+            BODY=$(gh release view "$TAG" --repo "${{ github.repository }}" --json body -q .body)
+          fi
+
+          # Breaking 判定: CHANGELOG の見出しに "Breaking" or "破壊" が含まれるか
+          if printf '%s\n' "$BODY" | grep -qiE '^[[:space:]]*###[[:space:]]+(Breaking|破壊)'; then
+            IS_BREAKING="true"
+          else
+            IS_BREAKING="false"
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "is_breaking=$IS_BREAKING" >> "$GITHUB_OUTPUT"
+          # body は multi-line なので heredoc 記法で GITHUB_OUTPUT に書く
+          {
+            echo 'body<<RELEASE_BODY_EOF'
+            printf '%s\n' "$BODY"
+            echo 'RELEASE_BODY_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Ensure adopters.json is valid
+        env:
+          ADOPTERS_FILE: .github/adopters.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! jq -e '.adopters | type == "array" and length > 0' "$ADOPTERS_FILE" >/dev/null; then
+            echo "::error::adopters.json is missing or empty .adopters array"
+            exit 1
+          fi
+          jq -c '.adopters[]' "$ADOPTERS_FILE" | while read -r row; do
+            repo=$(echo "$row" | jq -r '.repo')
+            if [ -z "$repo" ] || [ "$repo" = "null" ]; then
+              echo "::error::adopters[].repo is empty in: $row"
+              exit 1
+            fi
+          done
+          echo "✅ adopters.json validated ($(jq '.adopters | length' "$ADOPTERS_FILE") entries)"
+
+      - name: Ensure labels exist in each adopter (idempotent)
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.ADOPTER_NOTIFY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::ADOPTER_NOTIFY_TOKEN not configured — skipping label creation"
+            exit 0
+          fi
+          jq -r '.adopters[].repo' .github/adopters.json | while read -r repo; do
+            for label_spec in \
+              "ci-templates-update|0E8A16|_ci-templates の新リリース通知" \
+              "breaking-change|B60205|Breaking Change を含む変更"
+            do
+              name="${label_spec%%|*}"
+              rest="${label_spec#*|}"
+              color="${rest%%|*}"
+              desc="${rest#*|}"
+              # 既存ラベルがあれば skip (gh label create は重複時に exit 1)
+              if gh label list --repo "$repo" --json name -q '.[].name' | grep -qx "$name"; then
+                continue
+              fi
+              gh label create "$name" --repo "$repo" --color "$color" --description "$desc" || true
+            done
+          done
+
+      - name: Open notification issue in each adopter
+        env:
+          GH_TOKEN: ${{ secrets.ADOPTER_NOTIFY_TOKEN }}
+          RELEASE_TAG: ${{ steps.rel.outputs.tag }}
+          RELEASE_URL: ${{ steps.rel.outputs.url }}
+          RELEASE_BODY: ${{ steps.rel.outputs.body }}
+          IS_BREAKING: ${{ steps.rel.outputs.is_breaking }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            echo "::notice::DRY RUN mode — no issues will be created"
+          elif [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::ADOPTER_NOTIFY_TOKEN is not configured (and not in dry-run). Aborting."
+            exit 1
+          fi
+
+          BODY_FILE=$(mktemp)
+          # adopters.json を 1 行 1 オブジェクトで流す
+          jq -c '.adopters[]' .github/adopters.json | while read -r row; do
+            repo=$(echo "$row" | jq -r '.repo')
+            uses=$(echo "$row" | jq -r '.uses | join(", ")')
+
+            if [ "$IS_BREAKING" = "true" ]; then
+              title="⚠ ci-templates ${RELEASE_TAG} がリリースされました (Breaking Change 含む)"
+              labels="ci-templates-update,breaking-change"
+              breaking_note=$'\n⚠ **Breaking Change が含まれています**。次回 CI 実行前に CHANGELOG を確認し、必要に応じて呼び出し側を修正してください。\n'
+            else
+              title="ci-templates ${RELEASE_TAG} がリリースされました"
+              labels="ci-templates-update"
+              breaking_note=""
+            fi
+
+            # body を tmp ファイルに書く (heredoc を gh issue create に直接渡すと
+            # クォート / 改行のトラブルが起きやすいため、--body-file を使う)
+            {
+              printf '**`@v0` floating tag が %s に移動しました。**\n\n' "$RELEASE_TAG"
+              printf -- '- リリース詳細: %s\n' "$RELEASE_URL"
+              printf -- '- このリポジトリで使用中の workflow: %s\n' "$uses"
+              if [ -n "$breaking_note" ]; then
+                printf '%s\n' "$breaking_note"
+              fi
+              printf '\n---\n\n#### CHANGELOG 抜粋\n\n'
+              printf '%s\n' "$RELEASE_BODY"
+              printf '\n---\n\n🤖 自動投稿 (_ci-templates の notify-adopters workflow)\n'
+            } > "$BODY_FILE"
+
+            echo "::group::$repo"
+            if [ "${DRY_RUN:-false}" = "true" ]; then
+              echo "Would create issue in $repo:"
+              echo "  title: $title"
+              echo "  labels: $labels"
+              echo "  body (preview, first 10 lines):"
+              head -n 10 "$BODY_FILE" | sed 's/^/    | /'
+            else
+              gh issue create \
+                --repo "$repo" \
+                --title "$title" \
+                --label "$labels" \
+                --body-file "$BODY_FILE"
+            fi
+            echo "::endgroup::"
+          done
+
+          rm -f "$BODY_FILE"
+
+      - name: Job Summary
+        if: always()
+        env:
+          RELEASE_TAG: ${{ steps.rel.outputs.tag }}
+          IS_BREAKING: ${{ steps.rel.outputs.is_breaking }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        shell: bash
+        run: |
+          {
+            echo "## 📢 Notify adopters: ${RELEASE_TAG:-?}"
+            echo ""
+            echo "| 項目 | 値 |"
+            echo "|---|---|"
+            echo "| Tag | \`${RELEASE_TAG:-?}\` |"
+            echo "| Breaking | ${IS_BREAKING:-?} |"
+            echo "| Adopters | $(jq '.adopters | length' .github/adopters.json) |"
+            echo "| Mode | ${DRY_RUN:-live} |"
+            echo "| Status | ${{ job.status }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
