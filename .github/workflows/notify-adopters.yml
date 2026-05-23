@@ -76,11 +76,12 @@ jobs:
             IS_BREAKING="false"
           fi
 
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
-          echo "is_breaking=$IS_BREAKING" >> "$GITHUB_OUTPUT"
-          # body は multi-line なので heredoc 記法で GITHUB_OUTPUT に書く
+          # SC2129 回避: 個別リダイレクトでなく単一ブロックでまとめて書く。
+          # body は multi-line なので GITHUB_OUTPUT の heredoc 記法で末尾に置く。
           {
+            echo "tag=$TAG"
+            echo "url=$URL"
+            echo "is_breaking=$IS_BREAKING"
             echo 'body<<RELEASE_BODY_EOF'
             printf '%s\n' "$BODY"
             echo 'RELEASE_BODY_EOF'
@@ -170,6 +171,8 @@ jobs:
 
             # body を tmp ファイルに書く (heredoc を gh issue create に直接渡すと
             # クォート / 改行のトラブルが起きやすいため、--body-file を使う)
+            # SC2016: 単一クォート内の backtick (@v0) は markdown 用の literal で expand 意図なし。
+            # shellcheck disable=SC2016
             {
               printf '**`@v0` floating tag が %s に移動しました。**\n\n' "$RELEASE_TAG"
               printf -- '- リリース詳細: %s\n' "$RELEASE_URL"
