@@ -1,4 +1,8 @@
-# audit-ci-drift 設計
+# audit-ci-drift 設計と実装
+
+> **ステータス**: F-1 実装済み (案 A 採用、PAT 方式で開始)。実装は
+> [.github/workflows/notify-adopters.yml](../.github/workflows/notify-adopters.yml) と
+> [.github/adopters.json](../.github/adopters.json) に存在。本ドキュメントは設計判断の記録と運用手順を兼ねる。
 
 `@v0` floating tag を pin している採用側プロジェクト（現在 4、目標 14）に対し、
 **`v0` の指す SHA が変わった = 新リリースが降ってきた**ことを知らせる仕組み。
@@ -164,11 +168,55 @@ EOF
 - [.github/workflows/release-please.yml](../.github/workflows/release-please.yml) — リリース自動化
 - [README.md](../README.md) 採用状況テーブル — 4 プロジェクト現況
 
-## 次のアクション
+## 実装状況 (2026-05 時点)
 
-このドキュメントは **設計** の段階。実装には以下のユーザー判断が必要：
+| Phase | 内容 | 状態 |
+|---|---|---|
+| F-1 | `.github/adopters.json` + `notify-adopters.yml` 実装、`workflow_dispatch` での dry-run サポート | ✅ 実装済み |
+| F-2 | `ADOPTER_NOTIFY_TOKEN` を発行・`scripts/deploy-secrets.mjs` で各 adopter repo に配備 | ⏭️ 運用判断 (本実装 PR 後) |
+| F-3 | 初回 release で本番有効化 | ⏭️ F-2 後 |
+| F-4 | 14 採用達成時点で GitHub App 化 (PAT 廃止) | ⏭️ 採用数次第 |
 
-1. PAT 方式 / GitHub App 方式どちらで開始するか
-2. 通知の閾値（全リリース通知 / Breaking のみ通知 / MINOR 以上のみ）
-3. 採用側ラベルの命名（上記案で OK か）
-4. dry-run フェーズを挟むか（推奨: 挟む）
+### 設計判断 (F-1 実装で確定したもの)
+
+| 判断 | 採用 | 根拠 |
+|---|---|---|
+| 認証方式 | **PAT (`ADOPTER_NOTIFY_TOKEN` 単一 secret)** | 現状 4 採用、GitHub App は overkill。F-4 で移行 |
+| 通知閾値 | **全リリース通知** | release-please は MINOR/PATCH 単位、頻度が低いので noise にならない |
+| ラベル命名 | `ci-templates-update` (緑) / `breaking-change` (赤) | ラベル未存在時は workflow が自動 create (idempotent) |
+| dry-run | `workflow_dispatch` の `dry_run` input (default `true`) | 設計通り。本番テスト前に `gh workflow run notify-adopters.yml -f release_tag=v0.6.0 -f dry_run=true` で検証可 |
+
+### 運用手順
+
+```bash
+# 1. ADOPTER_NOTIFY_TOKEN を発行 (fine-grained PAT)
+#    Resource owner: daiwajuki org
+#    Repository access: All repositories (or .github/adopters.json の repo 群)
+#    Permissions: Issues = Read and write
+
+# 2. _ci-templates repo に配備
+gh secret set ADOPTER_NOTIFY_TOKEN \
+  --repo daiwajuki/ci-templates \
+  --body "<token-string>"
+
+# 3. dry-run でテスト
+gh workflow run notify-adopters.yml \
+  --repo daiwajuki/ci-templates \
+  -f release_tag=v0.6.0 \
+  -f dry_run=true
+
+# 4. 結果確認 → 本番リリース時に release: published で自動発火
+```
+
+### 新規 adopter 追加時
+
+[.github/adopters.json](../.github/adopters.json) に追記:
+
+```json
+{
+  "repo": "daiwajuki/NewProject",
+  "uses": ["ci-next", "deploy-cloudrun-next"]
+}
+```
+
+その PR と同じタイミングで [README.md](../README.md) の採用状況テーブルも更新する。

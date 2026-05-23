@@ -14,7 +14,7 @@
 | `EXTERNAL_CHECKOUT_TOKEN` | `additional-build-context-repos` の private repo を clone (PAT 方式) | `contents: read` (対象 repo のみ) | 1 年 | 同上 | 採用側 deploy 実行 repo の secret |
 | `EXTERNAL_CHECKOUT_APP_ID` | 同上 (GitHub App 方式、推奨) | — (App ID 数字) | 永続 | 1Password | 同上 |
 | `EXTERNAL_CHECKOUT_APP_PRIVATE_KEY` | 同上 (GitHub App private key) | install 先 repo + `contents: read` | App による (通常 1 年) | 同上 | 同上 |
-| `ADOPTER_NOTIFY_TOKEN`（将来） | 採用側 14 リポへの Issue 投稿 | `issues: write` (`daiwajuki/*` 全リポ) | 1 年 | 同上 | `_auth` / `_design-system` / `_ci-templates` の secret |
+| `ADOPTER_NOTIFY_TOKEN` | 採用側 14 リポへの Issue 投稿 (`_ci-templates/notify-adopters.yml`) | `issues: write` (`daiwajuki/*` 全リポ) | 1 年 | 同上 | `_ci-templates` の repo secret (F-1 実装済み、F-2 運用判断待ち) |
 
 **重要**: 上記すべて **r-taniguchi 個人名義の fine-grained PAT** で発行する。machine user は採らない（GitHub Team 課金 +$4/月と 2FA 管理の負担に見合わないため）。
 
@@ -191,7 +191,7 @@ gh secret delete GH_PACKAGES_TOKEN_OLD --org daiwajuki
 | Cloud Run / Artifact Registry へのデプロイ | WIF | ✅ 実装済み | PAT 不要 |
 | GitHub Packages の install | `GH_PACKAGES_TOKEN` | ❌ GitHub 仕様で未対応 | 削減不可 |
 | `_auth` / `_design-system` の cross-repo clone | `AUTH_REPO_TOKEN` / `DS_REPO_TOKEN` | ⚠ `gh` CLI 経由なら OIDC で代替可能 | 将来削減候補 |
-| 採用側 14 リポへの Issue 投稿（将来） | `ADOPTER_NOTIFY_TOKEN`（未実装） | ✅ `gh` CLI + OIDC で実装予定 | PAT 不要 |
+| 採用側 14 リポへの Issue 投稿 | `ADOPTER_NOTIFY_TOKEN` (PAT、F-1 実装済み) | ⚠ 将来 GitHub App で代替 (F-4) | F-4 完了時に PAT 廃止 |
 
 ## 関連文書
 

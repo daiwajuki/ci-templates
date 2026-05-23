@@ -117,7 +117,9 @@ _ci-templates/
 │   │   ├── deploy-cloudrun-laravel.yml    # Laravel × Cloud Run（WIF）
 │   │   ├── deploy-cloudrun-fastapi.yml    # FastAPI × Cloud Run（WIF）
 │   │   ├── self-test.yml                  # actionlint + 3 fixture 検証
-│   │   └── release-please.yml             # release PR + v0 floating tag 自動更新
+│   │   ├── release-please.yml             # release PR + v0 floating tag 自動更新
+│   │   └── notify-adopters.yml            # ★ release: published で adopters.json の各 repo に Issue 投稿
+│   ├── adopters.json                       # ★ notify-adopters.yml の宛先リスト
 │   └── actions/
 │       └── setup-node-volta/              # Volta 対応 Node セットアップ
 ├── dockerfiles/                           # ★ Phase C: copy 配布
@@ -140,7 +142,7 @@ _ci-templates/
 │   ├── usage-deploy-fastapi.md
 │   ├── usage-sync-templates.md            # ★ Phase C: sync-templates CLI 使い方
 │   ├── versioning.md
-│   └── audit-ci-drift-design.md           # Phase F 設計書（実装は未着手）
+│   └── audit-ci-drift-design.md           # Phase F 設計 + F-1 実装記録
 ├── fixtures/
 │   ├── minimal-next/                      # ci-next.yml self-test 用
 │   ├── minimal-laravel/                   # ci-laravel.yml self-test 用
