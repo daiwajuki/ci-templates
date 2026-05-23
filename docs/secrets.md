@@ -11,6 +11,9 @@
 | `GH_PACKAGES_TOKEN` | `@daiwajuki/*` private packages の install | `read:packages` | 1 年 | 1Password `daiwajuki-ops` ボルト | `daiwajuki` org secret (All repositories) |
 | `AUTH_REPO_TOKEN` | `_auth` リポを cross-repo clone | `contents: read` (`daiwajuki/daiwajuki-auth` のみ) | 1 年 | 同上 | 各 consumer repo の secret |
 | `DS_REPO_TOKEN` | `_design-system` リポを cross-repo clone | `contents: read` (`daiwajuki/daiwajuki-UIdesign` のみ) | 1 年 | 同上 | 各 consumer repo の secret |
+| `EXTERNAL_CHECKOUT_TOKEN` | `additional-build-context-repos` の private repo を clone (PAT 方式) | `contents: read` (対象 repo のみ) | 1 年 | 同上 | 採用側 deploy 実行 repo の secret |
+| `EXTERNAL_CHECKOUT_APP_ID` | 同上 (GitHub App 方式、推奨) | — (App ID 数字) | 永続 | 1Password | 同上 |
+| `EXTERNAL_CHECKOUT_APP_PRIVATE_KEY` | 同上 (GitHub App private key) | install 先 repo + `contents: read` | App による (通常 1 年) | 同上 | 同上 |
 | `ADOPTER_NOTIFY_TOKEN`（将来） | 採用側 14 リポへの Issue 投稿 | `issues: write` (`daiwajuki/*` 全リポ) | 1 年 | 同上 | `_auth` / `_design-system` / `_ci-templates` の secret |
 
 **重要**: 上記すべて **r-taniguchi 個人名義の fine-grained PAT** で発行する。machine user は採らない（GitHub Team 課金 +$4/月と 2FA 管理の負担に見合わないため）。
@@ -50,7 +53,42 @@ gh secret list --org daiwajuki
 gh secret list --repo daiwajuki/Portal
 ```
 
-ファンアウト配備は `_auth/scripts/deploy-auth-yml.mjs` を参考に `_ci-templates/scripts/deploy-secrets.mjs`（未実装、必要時に追加）を作る想定。
+## ファンアウト配備 (scripts/deploy-secrets.mjs)
+
+14 プロジェクトに同じ secret を一括配備するための CLI。**デフォルト dry-run** で、`--commit` を明示しないと書き込まない。
+
+```bash
+# org-level secret (GH_PACKAGES_TOKEN など)
+GH_PACKAGES_TOKEN_VAL=ghp_xxxx node scripts/deploy-secrets.mjs \
+  --target=GH_PACKAGES_TOKEN --scope=org \
+  --value-from=env:GH_PACKAGES_TOKEN_VAL --commit
+
+# 14 プロジェクト全部に repo-level secret を配備
+DS_TOKEN_VAL=ghp_yyyy node scripts/deploy-secrets.mjs \
+  --target=DS_REPO_TOKEN --scope=repo --projects=active \
+  --value-from=env:DS_TOKEN_VAL --commit
+
+# 限定 (例: ICPCostHub と ICPForms だけ)
+node scripts/deploy-secrets.mjs \
+  --target=EXTERNAL_CHECKOUT_TOKEN --scope=repo \
+  --projects=ICPCostHub,ICPForms \
+  --value-from=env:EXT_TOKEN_VAL --commit
+
+# 改行を含む値 (App private key の PEM など) はファイル経由
+node scripts/deploy-secrets.mjs \
+  --target=EXTERNAL_CHECKOUT_APP_PRIVATE_KEY --scope=repo --projects=active \
+  --value-from=file:./app-private-key.pem --commit
+```
+
+安全策:
+
+- **値は絶対にログに出ない** (長さ + 先頭4 + 末尾4 のみ preview)
+- 値の受け渡しは `--body-file -` (stdin) で、プロセス一覧に乗らない
+- `status="archived"` のプロジェクトは自動で除外 (`--include-archived` で含める)
+- `githubRepo` が空のエントリは自動 skip
+- 後方互換のため `--target` は UPPER_SNAKE_CASE のみ受理 (`colocate-token` のような hyphen 名は拒否)
+
+配備後の確認は `node scripts/audit-secrets.mjs` で行う (同じ projects-meta.json を読む)。
 
 ## secret 名の制約と reusable workflow での扱い
 
