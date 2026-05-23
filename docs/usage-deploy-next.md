@@ -74,9 +74,10 @@ jobs:
 | `smoke-expected-statuses` | string | `'200 302 307'` | 成功と判定する HTTP ステータス（スペース区切り）|
 | `enable-rollback` | boolean | `true` | 失敗時に前リビジョンへ戻す |
 | `route-to-latest` | boolean | `true` | 成功時に latest へ 100% トラフィック |
-| `colocate-repo` | string | `''` | ビルド前に sibling 配置する外部リポジトリ |
+| `colocate-repo` | string | `''` | ビルド前に sibling 配置する外部リポジトリ（旧パターン。新規利用は `additional-build-context-repos` 推奨）|
 | `colocate-ref` | string | `''` | colocate-repo の ref |
 | `colocate-path` | string | `''` | 配置先（リポジトリルートからの相対パス）|
+| `additional-build-context-repos` | string | `''` | v0.7+ — BuildKit additional contexts に渡す追加 repo（改行区切り `name=owner/repo[@ref]`、image モードのみ）|
 | `timeout-minutes` | number | `25` | ジョブタイムアウト |
 
 ### secrets
@@ -85,6 +86,9 @@ jobs:
 |---|---|---|
 | `COLOCATE_TOKEN` | 任意 | colocate-repo がプライベートの場合の PAT。未指定時は `github.token`。**v0.6.0 で `colocate-token` から rename**（GitHub Actions secret 名にハイフン不可のため） |
 | `GH_PACKAGES_TOKEN` | 任意 | GitHub Packages の private dependency を取得するためのトークン (例: `@daiwajuki/ui-design`)。未指定時は `secrets.GITHUB_TOKEN` に自動フォールバック (同 owner の package まで読める)。詳細は下記「GitHub Packages 経由の private dependency」を参照 |
+| `external-checkout-token` | 任意 | v0.7+ — `additional-build-context-repos` の private repo を clone する PAT。GitHub App 方式を使うならこれは不要 |
+| `external-checkout-app-id` | 任意 | v0.7+ — GitHub App ID（推奨）。private key と組で install token を mint |
+| `external-checkout-app-private-key` | 任意 | v0.7+ — GitHub App private key (PEM)。app-id と組で必須 |
 
 ## なぜ smoke で 200/302/307 を許容するか
 
@@ -165,3 +169,54 @@ jobs:
 | smoke で 503 が返り続ける | コンテナが起動失敗 | Cloud Run logs を確認、`PORT` env を読んでいるか / Dockerfile の CMD を点検 |
 | 認証 redirect で 401 になる | `smoke-expected-statuses` に 401 が無い | 専用 health endpoint を作るのが推奨 |
 | `npm error 403 permission_denied: read_package` (例: `@daiwajuki/ui-design`) | Package 側の Manage Actions access に consumer repo が無い | 上記「Package 側の access 設定」参照。token 側ではなく package 側の権限問題 |
+
+## v0.7+ 追加: 外部 repo を BuildKit context に同梱
+
+`additional-build-context-repos` で別 repo を build context として注入できる（`colocate-repo` の上位互換、複数 repo 同時に指定可）。
+
+```yaml
+jobs:
+  deploy:
+    uses: daiwajuki/ci-templates/.github/workflows/deploy-cloudrun-next.yml@v0
+    with:
+      build-mode: image
+      service-name: bidflow-web
+      source-path: ./web
+      build-context: ./web
+      dockerfile-path: Dockerfile
+      ar-repo: bidflow
+      image-name: web
+      additional-build-context-repos: |
+        ui-design=daiwajuki/daiwajuki-UIdesign@v1.12.0
+        forms-py=daiwajuki/pdf-forms@main
+    secrets: inherit
+```
+
+Dockerfile では `--from=<name>` で参照：
+
+```dockerfile
+COPY --from=ui-design . /app/_design-system
+COPY --from=forms-py packages/forms-py /tmp/forms-py
+```
+
+### colocate-repo との違い
+
+| 観点 | colocate-repo（旧） | additional-build-context-repos（v0.7+） |
+|---|---|---|
+| 同時に指定できる repo 数 | 1 個 | 複数 |
+| build context への組込 | sibling として配置（`COPY ../_design-system`） | BuildKit `--from=<name>` 参照 |
+| Dockerfile 側のパス依存 | コンテキスト構造に縛られる | `name` で論理参照、配置自由 |
+| 認証 | `COLOCATE_TOKEN` (PAT) | GitHub App credentials (推奨) or PAT or github.token |
+
+新規プロジェクトでは `additional-build-context-repos` を推奨。既存の `colocate-repo` 採用 (BidFlow web 等) は当面そのまま動く。
+
+### 認証方式
+
+優先順:
+
+1. **GitHub App credentials**（推奨。短命・権限境界明確）
+2. **PAT** (`external-checkout-token`)
+3. **github.token** (fallback、同 repo・public のみ)
+
+詳細は [usage-deploy-laravel.md](usage-deploy-laravel.md) の同セクション参照。
+

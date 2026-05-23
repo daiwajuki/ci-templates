@@ -50,6 +50,7 @@ jobs:
 | `enable-rollback` | boolean | `true` | 失敗時に前リビジョンへ戻す |
 | `route-to-latest` | boolean | `true` | 成功時に latest へ 100% トラフィック |
 | `timeout-minutes` | number | `25` | ジョブタイムアウト |
+| `additional-build-context-repos` | string | `''` | v0.7+ — BuildKit additional contexts に渡す追加 repo（改行区切り `name=owner/repo[@ref]`）|
 
 ## イメージタグの命名
 
@@ -95,3 +96,42 @@ jobs:
 ```
 
 `ar-repo` は共有可能。`image-name` で識別する。
+
+## v0.7+ 追加: 外部 repo を BuildKit context に同梱
+
+`additional-build-context-repos` で別 repo を build context として注入できる。ICPForms backend に `daiwajuki/pdf-forms` の `forms-py` パッケージを同梱する用途を想定（ADR 0020 — `_pdf-forms` 配給パターン）。
+
+```yaml
+jobs:
+  deploy:
+    uses: daiwajuki/ci-templates/.github/workflows/deploy-cloudrun-fastapi.yml@v0
+    with:
+      service-name: icp-forms-api
+      source-path: ./backend
+      ar-repo: icp-forms
+      image-name: api
+      additional-build-context-repos: |
+        forms-py=daiwajuki/pdf-forms@main
+    secrets: inherit  # external-checkout-app-* / external-checkout-token を届けるため必須
+```
+
+Dockerfile では `--from=forms-py` で参照：
+
+```dockerfile
+COPY --from=forms-py packages/forms-py /tmp/forms-py
+RUN pip install /tmp/forms-py
+```
+
+### 認証方式（private repo 用）
+
+優先順:
+
+1. **GitHub App credentials**（推奨。短命・権限境界明確）
+   - `external-checkout-app-id` + `external-checkout-app-private-key`
+   - `actions/create-github-app-token@v1` で install token を mint
+2. **PAT**（後方互換）
+   - `external-checkout-token` に `contents:read` 以上の PAT
+3. **github.token**（fallback。同 repo・public のみ）
+
+詳細は [usage-deploy-laravel.md](usage-deploy-laravel.md) の同セクション参照（同じ実装）。
+

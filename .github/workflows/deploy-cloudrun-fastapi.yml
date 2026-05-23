@@ -51,6 +51,35 @@ on:
         description: ジョブのタイムアウト（分）
         type: number
         default: 25
+      additional-build-context-repos:
+        description: |
+          BuildKit additional build contexts として渡す追加 repo の一覧。
+          改行区切り。各行 `name=owner/repo[@ref]` 形式。例:
+            forms-py=daiwajuki/pdf-forms@main
+            shared-py=daiwajuki/python-shared@v1.2.0
+          指定された各 repo は `./_external/{name}` に shallow clone され、
+          `docker build --build-context {name}=./_external/{name}` として渡される。
+          private repo を含む場合は external-checkout-app-* もしくは external-checkout-token secret も必要。
+        type: string
+        default: ''
+    secrets:
+      external-checkout-token:
+        description: |
+          additional-build-context-repos の private repo を clone する直接 token。
+          PAT もしくは事前に mint した GitHub App installation token (contents:read 以上)。
+          App ID + private key を渡す方式 (推奨) を使う場合は外して下記 2 つを設定。
+        required: false
+      external-checkout-app-id:
+        description: |
+          GitHub App ID (数字)。external-checkout-app-private-key と組で使い、
+          install token を mint して cross-repo checkout する。
+          PAT 方式より権限境界が明確で renewable。指定時は external-checkout-token を上書き。
+        required: false
+      external-checkout-app-private-key:
+        description: |
+          GitHub App private key (PEM 全文)。external-checkout-app-id と組で必須。
+          install 先 repo + contents:read 権限が必要。
+        required: false
 
 permissions:
   contents: read
@@ -99,10 +128,88 @@ jobs:
           echo "sha_tag=${BASE}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
           echo "latest_tag=${BASE}:latest" >> "$GITHUB_OUTPUT"
 
+      # ─── BuildKit additional build contexts (オプション) ──────────────────
+      # `additional-build-context-repos` 経由で別 repo を build context として注入する。
+      # 例: ICPForms backend に `daiwajuki/pdf-forms` の forms-py パッケージを
+      # 同梱して embedded PDF 生成 (ADR 0020 — _pdf-forms 配給パターン)。
+
+      # GitHub App credentials の有無を env 経由で判定 (actionlint: secrets.X は if: で
+      # 直接参照不可なので、env に export してから出力 step で boolean 化)
+      - name: Detect App credentials presence
+        if: inputs.additional-build-context-repos != ''
+        id: has-app
+        env:
+          APP_ID: ${{ secrets.external-checkout-app-id }}
+        shell: bash
+        run: |
+          if [ -n "$APP_ID" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # App credentials が渡されていれば install token を mint。短命 (1h) で renewable。
+      - name: Generate GitHub App installation token
+        if: steps.has-app.outputs.available == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.external-checkout-app-id }}
+          private-key: ${{ secrets.external-checkout-app-private-key }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Clone additional repos for build contexts
+        if: inputs.additional-build-context-repos != ''
+        env:
+          REPOS: ${{ inputs.additional-build-context-repos }}
+          # 優先順: App-mint token > 直接 token > GITHUB_TOKEN (fallback、自 repo only)
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.external-checkout-token || secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _external
+          while IFS= read -r line; do
+            line="${line%%#*}"  # 行内コメント除去
+            line="$(echo "$line" | xargs || true)"  # 前後空白 trim
+            [ -z "$line" ] && continue
+            name="${line%%=*}"
+            spec="${line#*=}"
+            repo="${spec%%@*}"
+            if [ "$repo" = "$spec" ]; then
+              ref="main"
+            else
+              ref="${spec#*@}"
+            fi
+            echo "::group::Clone $repo@$ref → _external/$name"
+            gh repo clone "$repo" "_external/$name" -- --depth 1 --branch "$ref" --single-branch
+            echo "::endgroup::"
+          done <<<"$REPOS"
+
+      - name: Compute build-contexts argument
+        if: inputs.additional-build-context-repos != ''
+        id: contexts
+        env:
+          REPOS: ${{ inputs.additional-build-context-repos }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo 'value<<EOF'
+            while IFS= read -r line; do
+              line="${line%%#*}"
+              line="$(echo "$line" | xargs || true)"
+              [ -z "$line" ] && continue
+              name="${line%%=*}"
+              echo "$name=./_external/$name"
+            done <<<"$REPOS"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: ${{ inputs.source-path }}
+          build-contexts: ${{ steps.contexts.outputs.value }}
           push: true
           tags: |
             ${{ steps.image.outputs.sha_tag }}
