@@ -70,6 +70,44 @@ jobs:
 | `enable-rollback` | boolean | `true` | 失敗時に前リビジョンへ戻す |
 | `route-to-latest` | boolean | `true` | 成功時に latest へ 100% トラフィック |
 | `timeout-minutes` | number | `20` | ジョブタイムアウト |
+| `additional-build-context-repos` | string | `''` | BuildKit additional build contexts (image モードのみ・後述) |
+
+## inputs.additional-build-context-repos (v0.7+)
+
+別 repo の内容を `docker build --build-context` として注入したいときに使う。
+
+```yaml
+with:
+  build-mode: image
+  ar-repo: icp-cost-hub-api
+  image-name: api
+  additional-build-context-repos: |
+    forms-py=daiwajuki/pdf-forms@main
+    ui-design=daiwajuki/daiwajuki-UIdesign@v1.11.0
+secrets:
+  external-checkout-token: ${{ secrets.PDF_FORMS_REPO_TOKEN }}
+```
+
+各 repo は `./_external/{name}` に `--depth 1 --single-branch` で clone され、Dockerfile
+側で `COPY --from={name} . /opt/{name}` のように受ける。
+
+**典型ユース**: `_pdf-forms` の `forms-py` パッケージを consumer Cloud Run コンテナに
+同梱する ADR 0020 構成。詳細は `_pdf-forms/docs/implementation-plan-v5.md` 参照。
+
+### 認証 (private repo を含む場合は必須)
+
+`external-checkout-token` secret に **PAT (contents:read 以上)** か **GitHub App
+installation token** を渡す。同 org 内 private repo を `gh repo clone` するため
+GITHUB_TOKEN だけでは不足。
+
+```yaml
+# caller 側で 1 度だけ準備
+secrets:
+  external-checkout-token: ${{ secrets.PDF_FORMS_REPO_TOKEN }}
+```
+
+未指定の場合は GITHUB_TOKEN にフォールバックするが、自 repo 以外の private を
+clone しようとすると 403 で失敗する。
 
 ## 必要な GitHub 設定
 
@@ -82,7 +120,9 @@ caller の repository に以下を設定すること：
 - `GCP_REGION`（input で `region` を指定する場合は不要）
 
 ### Secrets
-- 不要（WIF を使うため SA キーは持たない）。Secret Manager 経由は `secrets-yaml` で注入。
+- `image` モードで `additional-build-context-repos` を使う場合のみ:
+  - `PDF_FORMS_REPO_TOKEN` (or 任意名) — PAT/App token を caller の Secrets に登録
+- `source` モード or context 追加なしなら **Secrets は不要** (WIF のため SA キー不要、Secret Manager 経由は `secrets-yaml` で注入)
 
 ## スモークテストの動作
 
