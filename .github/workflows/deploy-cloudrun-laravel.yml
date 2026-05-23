@@ -78,9 +78,20 @@ on:
     secrets:
       external-checkout-token:
         description: |
-          additional-build-context-repos に private repo が含まれる場合、それらを
-          clone するための PAT もしくは GitHub App token (contents:read 以上)。
-          未指定なら GITHUB_TOKEN を試す (同 org の public repo or 自 repo のみ可能)。
+          additional-build-context-repos の private repo を clone する直接 token。
+          PAT もしくは事前に mint した GitHub App installation token (contents:read 以上)。
+          App ID + private key を渡す方式 (推奨) を使う場合は外して下記 2 つを設定。
+        required: false
+      external-checkout-app-id:
+        description: |
+          GitHub App ID (数字)。external-checkout-app-private-key と組で使い、
+          install token を mint して cross-repo checkout する。
+          PAT 方式より権限境界が明確で renewable。指定時は external-checkout-token を上書き。
+        required: false
+      external-checkout-app-private-key:
+        description: |
+          GitHub App private key (PEM 全文)。external-checkout-app-id と組で必須。
+          install 先 repo + contents:read 権限が必要。
         required: false
 
 permissions:
@@ -146,11 +157,24 @@ jobs:
       # `additional-build-context-repos` 経由で別 repo を build context として注入する。
       # 例: ICPCostHub api コンテナに `daiwajuki/pdf-forms` の forms-py パッケージを
       # 同梱して embedded PDF 生成 (ADR 0020 — _pdf-forms 配給パターン)。
+
+      # GitHub App credentials が渡された場合は install token を mint。
+      # この token は短命 (1h) で renewable、PAT より権限境界が明確。
+      - name: Generate GitHub App installation token
+        if: inputs.build-mode == 'image' && inputs.additional-build-context-repos != '' && secrets.external-checkout-app-id != ''
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.external-checkout-app-id }}
+          private-key: ${{ secrets.external-checkout-app-private-key }}
+          owner: ${{ github.repository_owner }}
+
       - name: Clone additional repos for build contexts
         if: inputs.build-mode == 'image' && inputs.additional-build-context-repos != ''
         env:
           REPOS: ${{ inputs.additional-build-context-repos }}
-          GH_TOKEN: ${{ secrets.external-checkout-token || secrets.GITHUB_TOKEN }}
+          # 優先順: App-mint token > 直接 token > GITHUB_TOKEN (fallback、自 repo only)
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.external-checkout-token || secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail

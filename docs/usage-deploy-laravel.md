@@ -96,18 +96,42 @@ secrets:
 
 ### 認証 (private repo を含む場合は必須)
 
-`external-checkout-token` secret に **PAT (contents:read 以上)** か **GitHub App
-installation token** を渡す。同 org 内 private repo を `gh repo clone` するため
-GITHUB_TOKEN だけでは不足。
+同 org 内 private repo を `gh repo clone` するため GITHUB_TOKEN だけでは不足。
+以下のいずれかの方式で認証する (App 方式 推奨)。
+
+#### 方式 A: GitHub App (推奨)
+
+permissions の境界が明確で renewable (PAT の有効期限管理が不要)。
 
 ```yaml
-# caller 側で 1 度だけ準備
+secrets:
+  external-checkout-app-id:          ${{ secrets.DAIWAJUKI_APP_ID }}
+  external-checkout-app-private-key: ${{ secrets.DAIWAJUKI_APP_PRIVATE_KEY }}
+```
+
+設定手順:
+1. https://github.com/organizations/<org>/settings/apps で "New GitHub App"
+2. Repository permissions → Contents → Read
+3. 該当 repo (caller + target both) に install
+4. App ID と private key (PEM) を caller の Secrets に登録
+
+reusable workflow 内で `actions/create-github-app-token@v1` で install token を
+mint (有効期間 1 時間、短命)。
+
+#### 方式 B: PAT (簡易)
+
+```yaml
 secrets:
   external-checkout-token: ${{ secrets.PDF_FORMS_REPO_TOKEN }}
 ```
 
-未指定の場合は GITHUB_TOKEN にフォールバックするが、自 repo 以外の private を
-clone しようとすると 403 で失敗する。
+fine-grained PAT で target repo の contents:read を付与。有効期限管理が caller 側
+の責務になる。
+
+#### 優先順位
+
+`external-checkout-app-id` > `external-checkout-token` > `GITHUB_TOKEN` (fallback)。
+どれも指定なし or 失効した場合、自 repo 以外の private clone は 403 で失敗する。
 
 ## 必要な GitHub 設定
 
