@@ -146,7 +146,7 @@ deploy 系は actionlint だけで保護されている。本物の deploy 検�
 | バグ修正（呼び出し側に変更を強いない） | `fix:` でコミット → PATCH bump |
 | docs / 内部リファクタ | `docs:` / `refactor:` でコミット → リリース発火しない |
 | 採用側に Breaking を能動通知したい | [docs/audit-ci-drift-design.md](docs/audit-ci-drift-design.md) 参照（未実装、設計のみ） |
-| ローカルで actionlint を試したい | Docker があれば self-test と同じコマンドが使える: `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color -shellcheck "shellcheck -S warning"` |
+| ローカルで actionlint を試したい | **CI と完全に同じコマンド**（severity = info、shellcheck デフォルト）: `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color` — `-shellcheck "shellcheck -S warning"` を付けると **info/style を取り逃して CI で fail する**（過去事例 #29: SC2129 / SC2016）。問題切り分けに severity を下げたいときだけ `-shellcheck "shellcheck -S warning"` を追加する |
 | 新 fixture を追加する | 最小構成は `fixtures/minimal-next/package.json` 参考（`scripts.lint = "echo 'lint ok'"` のようなダミーで OK）。CI 通過の事実だけ確認すれば良い |
 | 新 Dockerfile variant を足す | `dockerfiles/<stack>/Dockerfile.<variant>` を追加 → `scripts/sync-templates.mjs` の variant マップに登録 → `docs/usage-sync-templates.md` 更新 → `feat:` でコミット |
 | 14 プロジェクトの採用バージョンを今すぐ見たい | `node scripts/build-adoption-snapshot.mjs`（ローカル）または GitHub Actions の Snapshot Adoption workflow を `workflow_dispatch` |
