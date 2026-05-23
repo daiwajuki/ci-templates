@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.0](https://github.com/daiwajuki/ci-templates/compare/v0.7.0...v0.8.0) (2026-05-23)
+
+
+### Added
+
+* **deploy-fastapi,deploy-next:** additional-build-context-repos support ([#26](https://github.com/daiwajuki/ci-templates/issues/26)) ([1f3db76](https://github.com/daiwajuki/ci-templates/commit/1f3db7674743447d4f7e20f90868aa0c680ef9c9))
+* **deploy-laravel:** GitHub App credentials for cross-repo checkout ([#25](https://github.com/daiwajuki/ci-templates/issues/25)) ([4f6eac0](https://github.com/daiwajuki/ci-templates/commit/4f6eac0c6ceb2e2b571b28b7d024f5593f684d99))
+* **scripts:** add deploy-secrets.mjs for 14-project secret fanout ([#27](https://github.com/daiwajuki/ci-templates/issues/27)) ([2730cd8](https://github.com/daiwajuki/ci-templates/commit/2730cd8864f88ef3146e14648cb42dfa679f1c60))
+* **scripts:** add show-legacy-peer-deps-status.mjs for Wave E exit decision ([#28](https://github.com/daiwajuki/ci-templates/issues/28)) ([77b42d6](https://github.com/daiwajuki/ci-templates/commit/77b42d60bc83e212a8a0af77a02cea16fdbd6a1a))
+
 ## [0.7.0](https://github.com/daiwajuki/ci-templates/compare/v0.6.0...v0.7.0) (2026-05-23)
 
 
