@@ -17,9 +17,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 編集 → 検証 → リリースのフロー
 
-### 1. ブランチを切って YAML を編集
+### 1. ブランチを切って YAML / Dockerfile / scripts を編集
 
-`.github/workflows/*.yml`（reusable workflows）と `.github/actions/setup-node-volta/`（composite action）が編集対象。docs/ も同じ PR で更新する。
+編集対象：
+
+- `.github/workflows/*.yml`（reusable workflows）と `.github/actions/setup-node-volta/`（composite action）— **live 参照**
+- `dockerfiles/{next,laravel,fastapi}/Dockerfile.*` と `docker-compose/*.yml` — **copy 配布**（`sync-templates.mjs` 経由で raw URL fetch）
+- `scripts/*.mjs` — 採用側 / CI から実行される Node スクリプト
+- `docs/` — 採用側が引く reference。同じ PR で更新
 
 ### 2. PR を出すと self-test が走る
 
@@ -69,6 +74,16 @@ GitHub Actions の制約。`colocate-token` は **空文字に評価される** 
 
 採用側 README / docs に「`secrets: inherit` 必須」を必ず明記する。過去事例: Portal CI が 5 連続失敗（v0.5.0 リリース時の 0.4.x 系試行錯誤）。
 
+### cross-repo checkout は GitHub App credentials を第一選択に
+
+`deploy-cloudrun-laravel.yml` の `additional-build-context-repos` のように **別 repo を BuildKit context へ注入** する場合、認証は以下の優先順で解決される:
+
+1. `external-checkout-app-id` + `external-checkout-app-private-key`（**推奨**: `actions/create-github-app-token` で install token を mint。短命・権限境界が明確）
+2. `external-checkout-token`（PAT。後方互換のため残置）
+3. `github.token`（fallback。同 repo・public のみ。private cross-repo は 403）
+
+新規 deploy 系 workflow に cross-repo checkout を足す場合は **同じ優先順を踏襲**する（`fastapi` / `next` 版への展開は Phase 3 で予定、commit 1d992a4 参照）。
+
 ## ファイル構造の要点
 
 ### 提供物の配布方式 2 種
@@ -76,11 +91,11 @@ GitHub Actions の制約。`colocate-token` は **空文字に評価される** 
 | 配布方式 | 対象 | 採用側の取り込み方 |
 |---|---|---|
 | **live 参照** | `.github/workflows/*.yml`（reusable workflow）、`.github/actions/setup-node-volta/`（composite action） | `uses: daiwajuki/ci-templates/...@v0` |
-| copy 配布（Phase C 以降、未着手） | Dockerfile / docker-compose / Renovate config 等 | `sync-templates.mjs`（未実装）でコピー |
+| **copy 配布** | `dockerfiles/{next,laravel,fastapi}/Dockerfile.*`、`docker-compose/*.yml` | `node ../_ci-templates/scripts/sync-templates.mjs --target=dockerfile --stack=next --variant=alpine` |
 
-現状は live 参照のみ。**新規 reusable workflow を足したら必ず self-test fixture と self-test job も追加**する（fixture 無しでマージすると採用側に「動くか不明な workflow」が降る）。
+**新規 reusable workflow を足したら必ず self-test fixture と self-test job も追加**する（fixture 無しでマージすると採用側に「動くか不明な workflow」が降る）。copy 配布物を追加した場合は `sync-templates.mjs` の variant マップと `docs/usage-sync-templates.md` を同期する。
 
-### 6 種の reusable workflow
+### reusable workflow 一覧
 
 | ファイル | スタック × 役割 | self-test fixture |
 |---|---|---|
@@ -90,8 +105,19 @@ GitHub Actions の制約。`colocate-token` は **空文字に評価される** 
 | `deploy-cloudrun-next.yml` | Next.js × Cloud Run deploy（buildpacks / Dockerfile） | self-test なし（GCP credentials 必須） |
 | `deploy-cloudrun-laravel.yml` | Laravel × Cloud Run deploy | 同上 |
 | `deploy-cloudrun-fastapi.yml` | FastAPI × Cloud Run deploy | 同上 |
+| `lint-commit-author.yml` | PR 新規 commit の author email を正規表現チェック（テスト用メール拒否） | self-test なし |
+| `snapshot-adoption.yml` | nightly 集計用 internal workflow（採用側からは呼ばない） | — |
 
 deploy 系は actionlint だけで保護されている。本物の deploy 検証は採用側で初めて踏む。
+
+### scripts/（Node 20+ 標準 fetch、追加 dep 不要）
+
+| ファイル | 実行場所 | 役割 |
+|---|---|---|
+| `sync-templates.mjs` | 採用側プロジェクト | GitHub raw URL から Dockerfile / compose を fetch してコピー。`.ci-templates.json` に履歴記録 |
+| `swap-deps-to-registry.mjs` | 採用側 CI（build 直前、commit しない） | `package.json` の `"@daiwajuki/X": "file:../_X"` を `"^X.Y.Z"` に書き換え。GitHub Packages から install させる |
+| `audit-secrets.mjs` | ローカル / メンテナ運用 | `gh secret list` で 14 プロジェクトの `GH_PACKAGES_TOKEN` / `AUTH_REPO_TOKEN` / `DS_REPO_TOKEN` 配備状況を Markdown 表で監査 |
+| `build-adoption-snapshot.mjs` | `snapshot-adoption.yml` (nightly) / ローカル | 全プロジェクトの `@daiwajuki/*` 採用バージョンを集計、Markdown + JSON 出力。`scripts/projects-meta.json` をワークスペース直下から読む（リポ内に sync copy がある前提） |
 
 ### 設定ファイル
 
@@ -101,6 +127,8 @@ deploy 系は actionlint だけで保護されている。本物の deploy 検�
 | `.release-please-manifest.json` | 現バージョンの正本 — 直接編集しない、release PR が更新する |
 | `.github/workflows/self-test.yml` | actionlint + 3 fixture の検証 orchestration |
 | `.github/workflows/release-please.yml` | release PR 生成 + マージ後の tag/v0 自動更新 |
+| `docs/adr/` | 設計判断の Architecture Decision Records（例: 0001 = projects registry の所在） |
+| `docs/versioning.md` / `docs/secrets.md` / `docs/usage-*.md` | 採用側が引く reference。input/secret を変えたら同じ PR で更新する |
 
 ## ワークスペースとの関係
 
@@ -120,3 +148,6 @@ deploy 系は actionlint だけで保護されている。本物の deploy 検�
 | 採用側に Breaking を能動通知したい | [docs/audit-ci-drift-design.md](docs/audit-ci-drift-design.md) 参照（未実装、設計のみ） |
 | ローカルで actionlint を試したい | Docker があれば self-test と同じコマンドが使える: `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color -shellcheck "shellcheck -S warning"` |
 | 新 fixture を追加する | 最小構成は `fixtures/minimal-next/package.json` 参考（`scripts.lint = "echo 'lint ok'"` のようなダミーで OK）。CI 通過の事実だけ確認すれば良い |
+| 新 Dockerfile variant を足す | `dockerfiles/<stack>/Dockerfile.<variant>` を追加 → `scripts/sync-templates.mjs` の variant マップに登録 → `docs/usage-sync-templates.md` 更新 → `feat:` でコミット |
+| 14 プロジェクトの採用バージョンを今すぐ見たい | `node scripts/build-adoption-snapshot.mjs`（ローカル）または GitHub Actions の Snapshot Adoption workflow を `workflow_dispatch` |
+| secret 配備状況を確認したい | `gh auth status` で daiwajuki org ログイン後、`node scripts/audit-secrets.mjs` |
