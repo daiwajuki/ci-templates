@@ -64,6 +64,24 @@ on:
         description: ジョブのタイムアウト（分）
         type: number
         default: 20
+      additional-build-context-repos:
+        description: |
+          BuildKit additional build contexts として渡す追加 repo の一覧 (image モードのみ)。
+          改行区切り。各行 `name=owner/repo[@ref]` 形式。例:
+            forms-py=daiwajuki/pdf-forms@main
+            ui-design=daiwajuki/daiwajuki-UIdesign@v1.11.0
+          指定された各 repo は `./_external/{name}` に shallow clone され、
+          `docker build --build-context {name}=./_external/{name}` として渡される。
+          private repo を含む場合は `external-checkout-token` secret も必要。
+        type: string
+        default: ''
+    secrets:
+      external-checkout-token:
+        description: |
+          additional-build-context-repos に private repo が含まれる場合、それらを
+          clone するための PAT もしくは GitHub App token (contents:read 以上)。
+          未指定なら GITHUB_TOKEN を試す (同 org の public repo or 自 repo のみ可能)。
+        required: false
 
 permissions:
   contents: read
@@ -124,11 +142,62 @@ jobs:
           echo "sha_tag=${BASE}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
           echo "latest_tag=${BASE}:latest" >> "$GITHUB_OUTPUT"
 
+      # ─── BuildKit additional build contexts (オプション) ──────────────────
+      # `additional-build-context-repos` 経由で別 repo を build context として注入する。
+      # 例: ICPCostHub api コンテナに `daiwajuki/pdf-forms` の forms-py パッケージを
+      # 同梱して embedded PDF 生成 (ADR 0020 — _pdf-forms 配給パターン)。
+      - name: Clone additional repos for build contexts
+        if: inputs.build-mode == 'image' && inputs.additional-build-context-repos != ''
+        env:
+          REPOS: ${{ inputs.additional-build-context-repos }}
+          GH_TOKEN: ${{ secrets.external-checkout-token || secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _external
+          while IFS= read -r line; do
+            line="${line%%#*}"  # 行内コメント除去
+            line="$(echo "$line" | xargs || true)"  # 前後空白 trim
+            [ -z "$line" ] && continue
+            name="${line%%=*}"
+            spec="${line#*=}"
+            repo="${spec%%@*}"
+            if [ "$repo" = "$spec" ]; then
+              ref="main"
+            else
+              ref="${spec#*@}"
+            fi
+            echo "::group::Clone $repo@$ref → _external/$name"
+            gh repo clone "$repo" "_external/$name" -- --depth 1 --branch "$ref" --single-branch
+            echo "::endgroup::"
+          done <<<"$REPOS"
+
+      - name: Compute build-contexts argument
+        if: inputs.build-mode == 'image' && inputs.additional-build-context-repos != ''
+        id: contexts
+        env:
+          REPOS: ${{ inputs.additional-build-context-repos }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo 'value<<EOF'
+            while IFS= read -r line; do
+              line="${line%%#*}"
+              line="$(echo "$line" | xargs || true)"
+              [ -z "$line" ] && continue
+              name="${line%%=*}"
+              echo "$name=./_external/$name"
+            done <<<"$REPOS"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and push image
         if: inputs.build-mode == 'image'
         uses: docker/build-push-action@v5
         with:
           context: ${{ inputs.source-path }}
+          build-contexts: ${{ steps.contexts.outputs.value }}
           push: true
           tags: |
             ${{ steps.image.outputs.sha_tag }}
