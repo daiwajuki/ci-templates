@@ -305,6 +305,7 @@ jobs:
             --service="${{ inputs.service-name }}" \
             --region="${{ steps.region.outputs.value }}" \
             --sort-by='~metadata.creationTimestamp' \
+            --limit=20 \
             --format=json \
             | jq -r 'map(select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))) | .[0].metadata.name // empty')
           if [ -z "$LATEST_READY" ]; then
@@ -368,7 +369,13 @@ jobs:
 
       # ─── 失敗時の rollback ──────────────────────────────────────────────
       - name: Rollback on failure
-        if: failure() && inputs.enable-rollback
+        # `failure()` だけだと WIF validation / auth / build など pre-deploy 段階の
+        # 失敗でも rollback が起動し、`gcloud not authenticated` 等のエラーで本来の
+        # 失敗原因が埋もれる。さらに新しい broken revision が存在しないのに前世代を
+        # 巻き戻すことで無関係なダウンタイムを誘発する恐れがある。
+        # `steps.deploy.conclusion == 'success'` で「deploy は通ったが route/smoke で
+        # 失敗した」場合のみに限定する。
+        if: failure() && inputs.enable-rollback && steps.deploy.conclusion == 'success'
         run: |
           echo "::warning::Smoke test failed. Rolling back ${{ inputs.service-name }}..."
           # ★ Ready filter なしで `--limit=2 | tail -1` だけだと、新規 deploy された
@@ -381,6 +388,7 @@ jobs:
             --service="${{ inputs.service-name }}" \
             --region="${{ steps.region.outputs.value }}" \
             --sort-by='~metadata.creationTimestamp' \
+            --limit=20 \
             --format=json \
             | jq -r '[.[] | select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))][1].metadata.name // empty')
           if [ -n "$PREV" ]; then
