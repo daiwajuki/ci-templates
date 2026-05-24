@@ -165,6 +165,26 @@ jobs:
           token: ${{ secrets.colocate-token || github.token }}
           path: ${{ inputs.colocate-path }}
 
+      - name: Validate WIF configuration
+        # ★ vars 未設定だと google-github-actions/auth が "Unable to generate
+        # OAuth token from environment" を返し、原因が consumer 側で読み解けない。
+        run: |
+          if [ -z "${{ vars.WIF_PROVIDER }}" ] || [ -z "${{ vars.WIF_SERVICE_ACCOUNT }}" ]; then
+            echo "::error::WIF configuration missing. Set the following in repository (or org) variables:"
+            echo "  - vars.WIF_PROVIDER          (e.g., projects/123/locations/global/workloadIdentityPools/.../providers/...)"
+            echo "  - vars.WIF_SERVICE_ACCOUNT   (e.g., github-deployer@PROJECT.iam.gserviceaccount.com)"
+            echo "  - vars.GCP_PROJECT_ID        (e.g., my-gcp-project)"
+            echo "  - vars.GCP_REGION (optional) (e.g., asia-northeast2)"
+            echo ""
+            echo "See _ci-templates/docs/secrets.md for full setup guide."
+            exit 1
+          fi
+          if [ -z "${{ vars.GCP_PROJECT_ID }}" ]; then
+            echo "::error::vars.GCP_PROJECT_ID is not set"
+            exit 1
+          fi
+          echo "WIF configuration OK"
+
       - name: Authenticate to GCP (WIF)
         uses: google-github-actions/auth@v2
         with:
@@ -333,13 +353,20 @@ jobs:
           # Defence: find the most recent Ready=True revision and route there
           # explicitly. If no Ready revision exists, fail loudly instead of leaving
           # spec.traffic in an unusable state.
+          #
+          # NOTE: We use jq rather than `gcloud --filter` because gcloud filter
+          # expressions do NOT scope both predicates to the same array element.
+          # `status.conditions.type=Ready AND status.conditions.status=True` would
+          # accept a broken revision (Ready=False, Active=True, ...) because some
+          # condition has type=Ready and some other condition has status=True.
+          # jq's `any(...; .type=="Ready" and .status=="True")` scopes both
+          # predicates to the same element, which is what we actually want.
           LATEST_READY=$(gcloud run revisions list \
             --service="${{ inputs.service-name }}" \
             --region="${{ steps.region.outputs.value }}" \
-            --filter='status.conditions.type=Ready AND status.conditions.status=True' \
             --sort-by='~metadata.creationTimestamp' \
-            --format='value(metadata.name)' \
-            --limit=1)
+            --format=json \
+            | jq -r 'map(select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))) | .[0].metadata.name // empty')
           if [ -z "$LATEST_READY" ]; then
             echo "::error::No Ready=True revision found for ${{ inputs.service-name }}; refusing to update traffic"
             exit 1
@@ -355,17 +382,20 @@ jobs:
           URL: ${{ steps.deploy.outputs.url }}
           PATH_SMOKE: ${{ inputs.smoke-path }}
           EXPECTED: ${{ inputs.smoke-expected-statuses }}
+        # ★ Next.js は SSR コンパイル + Vercel-like runtime 起動で cold start が
+        # 重め (10-20s)。旧 5×5s=25s では false-rollback の余地。7×5s=35s に拡張 +
+        # --max-time 15 で per-request 上限。
         run: |
           echo "Smoke testing: ${URL}${PATH_SMOKE} (expected: ${EXPECTED})"
-          for i in 1 2 3 4 5; do
-            STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "${URL}${PATH_SMOKE}" || echo "000")
+          for i in 1 2 3 4 5 6 7; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${URL}${PATH_SMOKE}" || echo "000")
             echo "attempt $i -> HTTP $STATUS"
             for ok in $EXPECTED; do
               if [ "$STATUS" = "$ok" ]; then exit 0; fi
             done
             sleep 5
           done
-          echo "::error::Smoke test failed."
+          echo "::error::Smoke test failed (7 retries, ~35s total)"
           exit 1
 
       # ─── 失敗時の rollback ──────────────────────────────────────────────
@@ -373,18 +403,23 @@ jobs:
         if: failure() && inputs.enable-rollback
         run: |
           echo "::warning::Rolling back ${{ inputs.service-name }} to previous revision"
+          # ★ Ready filter なしだと新規 deploy された Ready=False revision を
+          # rollback target に拾うリスク (race / 連続失敗時)。
           PREV=$(gcloud run revisions list \
             --service="${{ inputs.service-name }}" \
             --region="${{ steps.region.outputs.value }}" \
-            --format='value(name)' \
+            --filter='status.conditions.type=Ready AND status.conditions.status=True' \
+            --sort-by='~metadata.creationTimestamp' \
+            --format='value(metadata.name)' \
             --limit=2 | tail -1)
           if [ -n "$PREV" ]; then
             gcloud run services update-traffic "${{ inputs.service-name }}" \
               --region="${{ steps.region.outputs.value }}" \
               --to-revisions="${PREV}=100"
-            echo "Rolled back to ${PREV}"
+            echo "Rolled back to ${PREV} (Ready=True)"
           else
-            echo "::error::No previous revision found for rollback"
+            echo "::error::No Ready=True previous revision found for rollback — service may be left in broken state"
+            exit 1
           fi
 
       - name: Job Summary
