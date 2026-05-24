@@ -1,13 +1,11 @@
-name: Snapshot Adoption (nightly)
+name: Snapshot Adoption (nightly) — DEPRECATED
 
-# 14 プロジェクトの @daiwajuki/* 採用バージョンを集計し、
-# Step Summary に Markdown 表として表示。JSON は Artifact として保存。
-# governance-plan v3 Wave D ステップ 19。
+# ⚠️ 2026-05-24: この workflow は _tools/.github/workflows/snapshot-adoption.yml に移管されました。
+# projects-meta.json は _tools/data/projects-meta.json が正本（daiwajuki/tools リポ）。
+# 本ファイルはテンプレ参照用に残置。実 nightly 実行は daiwajuki/tools で行われます。
 
 on:
-  schedule:
-    - cron: '0 21 * * *'   # 毎日 06:00 JST (21:00 UTC)
-  workflow_dispatch:
+  workflow_dispatch:   # 手動実行のみ（cron 停止）
 
 permissions:
   contents: read
@@ -22,17 +20,11 @@ jobs:
       - name: Checkout _ci-templates
         uses: actions/checkout@v4
 
-      - name: Checkout scripts/projects-meta.json (workspace-level)
-        # 注: projects-meta.json はワークスペース直下にあるため、別途 fetch する必要あり。
-        # 暫定: _ci-templates リポに sync copy を置く (Wave D 実装時に決定)、
-        # または gh api で daiwajuki/workspace-config 等の専用リポから取得。
-        # ここでは _ci-templates 内に projects-meta.json のコピーがある前提で進める。
+      - name: Notice — moved to daiwajuki/tools
         run: |
-          if [ ! -f scripts/projects-meta.json ]; then
-            echo "::warning::scripts/projects-meta.json not found in _ci-templates."
-            echo "::warning::Wave D 実装時に projects-meta.json の同期方式を確定する必要あり。"
-            exit 0
-          fi
+          echo "::warning::This workflow is deprecated. Run snapshot-adoption in daiwajuki/tools instead."
+          echo "::warning::projects-meta.json の正本は _tools/data/projects-meta.json です。"
+          exit 0
 
       - name: Setup Node
         uses: actions/setup-node@v4

@@ -9,7 +9,7 @@
  *           出口判定) のための事前調査ツール。
  *
  * 仕組み:
- *  1. scripts/projects-meta.json から active プロジェクトを抽出
+ *  1. _tools/data/projects-meta.json から active プロジェクトを抽出
  *  2. 各プロジェクトディレクトリの存在と package.json の有無を確認
  *  3. `npm install --no-legacy-peer-deps --dry-run --no-audit --no-fund` を実行
  *  4. 終了コード + ERESOLVE 件数 + npm warn の件数を記録

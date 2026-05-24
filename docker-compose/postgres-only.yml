@@ -21,7 +21,7 @@ services:
       TZ: Asia/Tokyo
       PGTZ: Asia/Tokyo
     ports:
-      # CUSTOMIZE: scripts/ports.json で割り当てられた番号（5433-5442 帯）を .env で指定
+      # CUSTOMIZE: _tools/data/ports.json で割り当てられた番号（5433-5442 帯）を .env で指定
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data

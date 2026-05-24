@@ -25,7 +25,7 @@ docker compose down -v
 
 ## ポート競合への対応
 
-ワークスペース全体で `scripts/ports.json` がポートを静的管理しています。
+ワークスペース全体で `_tools/data/ports.json` がポートを静的管理しています。
 **自動フォールバック禁止**（グローバルルール 7）。
 
 各プロジェクトの `.env` で `ports.json` の割当を指定:
@@ -47,4 +47,4 @@ REDIS_PORT=6379        # 採用側で割り当て
 ## 関連
 
 - 使い方: [../docs/usage-sync-templates.md](../docs/usage-sync-templates.md)
-- ポートレジストリ: [../../scripts/ports.json](../../scripts/ports.json)
+- ポートレジストリ: [../../_tools/data/ports.json](../../_tools/data/ports.json)
