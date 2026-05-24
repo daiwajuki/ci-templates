@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/daiwajuki/ci-templates/compare/v0.9.0...v0.9.1) (2026-05-24)
+
+
+### Fixed
+
+* **deploy:** extend smoke retries, validate WIF vars, filter rollback by Ready ([#34](https://github.com/daiwajuki/ci-templates/issues/34)) ([866e866](https://github.com/daiwajuki/ci-templates/commit/866e866cbd0c6bfcdad69ae18e574f92d65bc465))
+
 ## [0.9.0](https://github.com/daiwajuki/ci-templates/compare/v0.8.0...v0.9.0) (2026-05-24)
 
 
