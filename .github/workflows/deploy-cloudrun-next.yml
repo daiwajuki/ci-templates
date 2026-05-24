@@ -405,13 +405,16 @@ jobs:
           echo "::warning::Rolling back ${{ inputs.service-name }} to previous revision"
           # ★ Ready filter なしだと新規 deploy された Ready=False revision を
           # rollback target に拾うリスク (race / 連続失敗時)。
+          # jq を使うのは gcloud --filter の AND が配列要素間でスコープされず
+          # broken revision (Ready=False, Active=True, ...) を誤って通すため
+          # (deploy-time route 側と同じ理由)。Ready=True に絞った newest 順で
+          # 2 番目 (= 直前の serving 候補) を取る。
           PREV=$(gcloud run revisions list \
             --service="${{ inputs.service-name }}" \
             --region="${{ steps.region.outputs.value }}" \
-            --filter='status.conditions.type=Ready AND status.conditions.status=True' \
             --sort-by='~metadata.creationTimestamp' \
-            --format='value(metadata.name)' \
-            --limit=2 | tail -1)
+            --format=json \
+            | jq -r '[.[] | select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))][1].metadata.name // empty')
           if [ -n "$PREV" ]; then
             gcloud run services update-traffic "${{ inputs.service-name }}" \
               --region="${{ steps.region.outputs.value }}" \

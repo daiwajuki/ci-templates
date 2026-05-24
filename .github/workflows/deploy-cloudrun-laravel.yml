@@ -374,13 +374,15 @@ jobs:
           # ★ Ready filter なしで `--limit=2 | tail -1` だけだと、新規 deploy された
           # Ready=False revision を rollback target に拾ってしまう (race / 連続失敗時)。
           # Ready=True の上から 2 番目 (= 直前の serving 候補) を取れば安全。
+          # jq を使うのは gcloud --filter の AND が配列要素間でスコープされず
+          # broken revision (Ready=False, Active=True, ...) を誤って通すため
+          # (deploy-time route 側と同じ理由)。
           PREV=$(gcloud run revisions list \
             --service="${{ inputs.service-name }}" \
             --region="${{ steps.region.outputs.value }}" \
-            --filter='status.conditions.type=Ready AND status.conditions.status=True' \
             --sort-by='~metadata.creationTimestamp' \
-            --format='value(metadata.name)' \
-            --limit=2 | tail -1)
+            --format=json \
+            | jq -r '[.[] | select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))][1].metadata.name // empty')
           if [ -n "$PREV" ]; then
             gcloud run services update-traffic "${{ inputs.service-name }}" \
               --region="${{ steps.region.outputs.value }}" \

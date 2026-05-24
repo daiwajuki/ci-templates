@@ -263,13 +263,20 @@ jobs:
           # Defence: find the most recent Ready=True revision and route there
           # explicitly. If no Ready revision exists, fail loudly instead of leaving
           # spec.traffic in an unusable state.
+          #
+          # NOTE: We use jq rather than `gcloud --filter` because gcloud filter
+          # expressions do NOT scope both predicates to the same array element.
+          # `status.conditions.type=Ready AND status.conditions.status=True` would
+          # accept a broken revision (Ready=False, Active=True, ...) because some
+          # condition has type=Ready and some other condition has status=True.
+          # jq's `any(...; .type=="Ready" and .status=="True")` scopes both
+          # predicates to the same element, which is what we actually want.
           LATEST_READY=$(gcloud run revisions list \
             --service="${{ inputs.service-name }}" \
             --region="${{ steps.region.outputs.value }}" \
-            --filter='status.conditions.type=Ready AND status.conditions.status=True' \
             --sort-by='~metadata.creationTimestamp' \
-            --format='value(metadata.name)' \
-            --limit=1)
+            --format=json \
+            | jq -r 'map(select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))) | .[0].metadata.name // empty')
           if [ -z "$LATEST_READY" ]; then
             echo "::error::No Ready=True revision found for ${{ inputs.service-name }}; refusing to update traffic"
             exit 1
@@ -310,13 +317,16 @@ jobs:
           echo "::warning::Rolling back ${{ inputs.service-name }} to previous revision"
           # ★ Ready filter なしだと新規 deploy された Ready=False revision を
           # rollback target に拾うリスク (race / 連続失敗時)。
+          # jq を使うのは gcloud --filter の AND が配列要素間でスコープされず
+          # broken revision (Ready=False, Active=True, ...) を誤って通すため
+          # (deploy-time route 側と同じ理由)。Ready=True に絞った newest 順で
+          # 2 番目 (= 直前の serving 候補) を取る。
           PREV=$(gcloud run revisions list \
             --service="${{ inputs.service-name }}" \
             --region="${{ steps.region.outputs.value }}" \
-            --filter='status.conditions.type=Ready AND status.conditions.status=True' \
             --sort-by='~metadata.creationTimestamp' \
-            --format='value(metadata.name)' \
-            --limit=2 | tail -1)
+            --format=json \
+            | jq -r '[.[] | select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))][1].metadata.name // empty')
           if [ -n "$PREV" ]; then
             gcloud run services update-traffic "${{ inputs.service-name }}" \
               --region="${{ steps.region.outputs.value }}" \
