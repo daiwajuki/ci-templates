@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/daiwajuki/ci-templates/compare/v0.9.1...v0.9.2) (2026-05-24)
+
+
+### Fixed
+
+* **deploy:** Cloud Run smoke/route/rollback hardening + diagnostics ([#36](https://github.com/daiwajuki/ci-templates/issues/36)) ([994e2d5](https://github.com/daiwajuki/ci-templates/commit/994e2d5a3a407c8c1aa0bcd7987f1d26449cd0a8))
+
 ## [0.9.1](https://github.com/daiwajuki/ci-templates/compare/v0.9.0...v0.9.1) (2026-05-24)
 
 
