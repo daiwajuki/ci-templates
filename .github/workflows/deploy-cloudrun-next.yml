@@ -317,12 +317,37 @@ jobs:
           env_vars: ${{ inputs.env-vars }}
           secrets: ${{ inputs.secrets-yaml }}
 
-      - name: Route 100% traffic to latest revision
+      - name: Route 100% traffic to latest Ready revision
         if: inputs.route-to-latest
         run: |
+          # `--to-latest` shifts traffic to whatever the latest deployed revision is,
+          # even if that revision is Ready=False. If the latest is broken, gcloud
+          # accepts the spec update but Cloud Run silently falls back to the previous
+          # Ready revision for actual serving. Worse, the broken spec.traffic value
+          # then rejects ALL subsequent update-traffic calls until manually fixed.
+          #
+          # Real incident: 2026-05-23 ICPCostHub revision 00017 was Ready=False but
+          # spec.traffic kept pointing at it, blocking every subsequent deploy's
+          # traffic shift until a human ran update-traffic --to-revisions= explicitly.
+          #
+          # Defence: find the most recent Ready=True revision and route there
+          # explicitly. If no Ready revision exists, fail loudly instead of leaving
+          # spec.traffic in an unusable state.
+          LATEST_READY=$(gcloud run revisions list \
+            --service="${{ inputs.service-name }}" \
+            --region="${{ steps.region.outputs.value }}" \
+            --filter='status.conditions.type=Ready AND status.conditions.status=True' \
+            --sort-by='~metadata.creationTimestamp' \
+            --format='value(metadata.name)' \
+            --limit=1)
+          if [ -z "$LATEST_READY" ]; then
+            echo "::error::No Ready=True revision found for ${{ inputs.service-name }}; refusing to update traffic"
+            exit 1
+          fi
+          echo "Routing 100% traffic to latest Ready revision: $LATEST_READY"
           gcloud run services update-traffic "${{ inputs.service-name }}" \
             --region="${{ steps.region.outputs.value }}" \
-            --to-latest
+            --to-revisions="${LATEST_READY}=100"
 
       # ─── スモークテスト ──────────────────────────────────────────────────
       - name: Smoke test
