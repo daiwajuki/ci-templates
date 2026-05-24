@@ -168,8 +168,14 @@ jobs:
       - name: Validate WIF configuration
         # ★ vars 未設定だと google-github-actions/auth が "Unable to generate
         # OAuth token from environment" を返し、原因が consumer 側で読み解けない。
+        # vars.* は env 経由で参照 (shell 直挿しを避ける defense-in-depth)。
+        env:
+          WIF_PROVIDER: ${{ vars.WIF_PROVIDER }}
+          WIF_SERVICE_ACCOUNT: ${{ vars.WIF_SERVICE_ACCOUNT }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
         run: |
-          if [ -z "${{ vars.WIF_PROVIDER }}" ] || [ -z "${{ vars.WIF_SERVICE_ACCOUNT }}" ]; then
+          set -euo pipefail
+          if [ -z "${WIF_PROVIDER:-}" ] || [ -z "${WIF_SERVICE_ACCOUNT:-}" ]; then
             echo "::error::WIF configuration missing. Set the following in repository (or org) variables:"
             echo "  - vars.WIF_PROVIDER          (e.g., projects/123/locations/global/workloadIdentityPools/.../providers/...)"
             echo "  - vars.WIF_SERVICE_ACCOUNT   (e.g., github-deployer@PROJECT.iam.gserviceaccount.com)"
@@ -179,7 +185,7 @@ jobs:
             echo "See _ci-templates/docs/secrets.md for full setup guide."
             exit 1
           fi
-          if [ -z "${{ vars.GCP_PROJECT_ID }}" ]; then
+          if [ -z "${GCP_PROJECT_ID:-}" ]; then
             echo "::error::vars.GCP_PROJECT_ID is not set"
             exit 1
           fi
@@ -340,6 +346,10 @@ jobs:
       - name: Route 100% traffic to latest Ready revision
         if: inputs.route-to-latest
         run: |
+          # set -e: gcloud / update-traffic 失敗で即 fail。
+          # set -o pipefail: gcloud 失敗を「No Ready revision」に化けさせない (gcloud
+          # の stderr を直接見せる方が診断性が高い)。
+          set -euo pipefail
           # `--to-latest` shifts traffic to whatever the latest deployed revision is,
           # even if that revision is Ready=False. If the latest is broken, gcloud
           # accepts the spec update but Cloud Run silently falls back to the previous
@@ -365,6 +375,7 @@ jobs:
             --service="${{ inputs.service-name }}" \
             --region="${{ steps.region.outputs.value }}" \
             --sort-by='~metadata.creationTimestamp' \
+            --limit=20 \
             --format=json \
             | jq -r 'map(select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))) | .[0].metadata.name // empty')
           if [ -z "$LATEST_READY" ]; then
@@ -400,18 +411,30 @@ jobs:
 
       # ─── 失敗時の rollback ──────────────────────────────────────────────
       - name: Rollback on failure
-        if: failure() && inputs.enable-rollback
+        # `failure()` だけだと WIF validation / auth / build など pre-deploy 段階の
+        # 失敗でも rollback が起動し、`gcloud not authenticated` 等のエラーで本来の
+        # 失敗原因が埋もれる。さらに新しい broken revision が存在しないのに前世代を
+        # 巻き戻すことで無関係なダウンタイムを誘発する恐れがある。
+        # `steps.deploy.conclusion == 'success'` で「deploy は通ったが route/smoke で
+        # 失敗した」場合のみに限定する。
+        if: failure() && inputs.enable-rollback && steps.deploy.conclusion == 'success'
         run: |
+          # set -euo pipefail: route 側と同じ理由 (gcloud 失敗を可視化)。
+          set -euo pipefail
           echo "::warning::Rolling back ${{ inputs.service-name }} to previous revision"
           # ★ Ready filter なしだと新規 deploy された Ready=False revision を
           # rollback target に拾うリスク (race / 連続失敗時)。
+          # jq を使うのは gcloud --filter の AND が配列要素間でスコープされず
+          # broken revision (Ready=False, Active=True, ...) を誤って通すため
+          # (deploy-time route 側と同じ理由)。Ready=True に絞った newest 順で
+          # 2 番目 (= 直前の serving 候補) を取る。
           PREV=$(gcloud run revisions list \
             --service="${{ inputs.service-name }}" \
             --region="${{ steps.region.outputs.value }}" \
-            --filter='status.conditions.type=Ready AND status.conditions.status=True' \
             --sort-by='~metadata.creationTimestamp' \
-            --format='value(metadata.name)' \
-            --limit=2 | tail -1)
+            --limit=20 \
+            --format=json \
+            | jq -r '[.[] | select(any(.status.conditions[]?; .type=="Ready" and .status=="True"))][1].metadata.name // empty')
           if [ -n "$PREV" ]; then
             gcloud run services update-traffic "${{ inputs.service-name }}" \
               --region="${{ steps.region.outputs.value }}" \
