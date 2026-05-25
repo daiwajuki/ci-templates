@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.10.0](https://github.com/daiwajuki/ci-templates/compare/v0.9.3...v0.10.0) (2026-05-25)
+
+
+### Added
+
+* **scripts:** add audit-ci-drift.mjs for adopters.json drift detection ([f296f62](https://github.com/daiwajuki/ci-templates/commit/f296f623ea69396516f8bd2c9ea9267d6b49ea0c))
+* **workflows:** add audit-drift.yml for weekly drift detection (F-6) ([24d9e6e](https://github.com/daiwajuki/ci-templates/commit/24d9e6e62b0c9bd25359e2d8ea0aeccdac076f81))
+
+
+### Fixed
+
+* **audit-ci-drift:** replace gh search code with repo contents enumeration ([843b0c9](https://github.com/daiwajuki/ci-templates/commit/843b0c98d94e37f23ffc5fca6d17ab08e6d8ba55))
+* **audit-drift:** skip audit when ADOPTER_NOTIFY_TOKEN missing in CI ([6e9f666](https://github.com/daiwajuki/ci-templates/commit/6e9f666eb00b3deaba41dd44704490a7805abdd9))
+* **deploy-next:** actually rename colocate-token to COLOCATE_TOKEN ([19743d1](https://github.com/daiwajuki/ci-templates/commit/19743d1243c77f864a12d85e78bc00fa506f418f))
+* **release:** dispatch notify-adopters from release-please (was never firing) ([b96ad7f](https://github.com/daiwajuki/ci-templates/commit/b96ad7ff30a088ba5b7f99a1910140fda9f2eec1))
+* **scripts:** resolve projects-meta.json from _tools/data after migration ([31745a5](https://github.com/daiwajuki/ci-templates/commit/31745a58e81ca1e11e15ca56c9373cee40137921))
+* **workflows:** opt into Node.js 24 runtime ahead of 2026-06-02 deadline ([4e2d548](https://github.com/daiwajuki/ci-templates/commit/4e2d548bc638c9f59fd25f59d9c6ee9f94747611))
+
 ## [0.9.3](https://github.com/daiwajuki/ci-templates/compare/v0.9.2...v0.9.3) (2026-05-25)
 
 
