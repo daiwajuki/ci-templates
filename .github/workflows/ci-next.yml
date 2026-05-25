@@ -59,6 +59,13 @@ on:
         description: colocate-repo がプライベートの場合のアクセストークン（未指定時は github.token）。secret 名はハイフン不可のためアンダースコアで命名。
         required: false
 
+# Node.js 24 を先取り opt-in (2026-06-02 で強制移行、それ以前に互換性を検証する)。
+# v4 actions (checkout/setup-node/cache/upload-artifact) と v1 (create-github-app-token)
+# が Node 20 ランタイムで動いている deprecation 警告に対応。
+# 参考: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 permissions:
   contents: read
   packages: read
