@@ -178,7 +178,7 @@ EOF
 | F-3 | 初回 release で本番有効化 | ⏭️ F-2 後 |
 | F-4 | 14 採用達成時点で GitHub App 化 (PAT 廃止) | ⏭️ 採用数次第 |
 | F-5 | drift 検出 script (`scripts/audit-ci-drift.mjs`) — local / remote 両モード、missing/stale/uses-mismatch/stale-pin/unknown-workflow を検出 | ✅ 実装済み |
-| F-6 | nightly workflow で `audit-ci-drift --remote` を回し、drift 検出時に Issue 投稿 or PR 作成 | ⏭️ F-5 の運用フィードバック後 |
+| F-6 | weekly workflow `.github/workflows/audit-drift.yml` で `audit-ci-drift --remote` を回し、drift 検出時に Issue 投稿 / 既存 issue にコメント (`ci-drift` ラベル) | ✅ 実装済み (`ADOPTER_NOTIFY_TOKEN` 未設定時は local fallback で degraded 動作) |
 
 ### 設計判断 (F-1 実装で確定したもの)
 

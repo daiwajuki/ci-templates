@@ -158,6 +158,7 @@ deploy 系は actionlint だけで保護されている。本物の deploy 検�
 | `.github/workflows/self-test.yml` | actionlint + 3 fixture の検証 orchestration |
 | `.github/workflows/release-please.yml` | release PR 生成 + マージ後の tag/v0 自動更新 |
 | `.github/workflows/notify-adopters.yml` | `release: published` で `.github/adopters.json` の各 repo に Issue を自動投稿（採用側への能動通知チャネル、v0.9.0〜） |
+| `.github/workflows/audit-drift.yml` | 週次 (Mon 0:00 JST) + workflow_dispatch で `audit-ci-drift.mjs --remote` を走らせ、drift 検出時に自リポへ Issue 投稿（既存 `ci-drift` ラベル open issue にはコメント追記）。F-6 実装。`ADOPTER_NOTIFY_TOKEN` を流用、未設定時は local fallback で degraded 動作 |
 | `.github/adopters.json` | `notify-adopters.yml` の宛先リスト。採用 repo を増減させたらここを更新する |
 | `docs/adr/` | 設計判断の Architecture Decision Records（例: 0001 = projects registry の所在） |
 | `docs/versioning.md` / `docs/secrets.md` / `docs/usage-*.md` | 採用側が引く reference。input/secret を変えたら同じ PR で更新する |

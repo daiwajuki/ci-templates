@@ -1,0 +1,166 @@
+name: Audit adopters drift
+
+# ───────────────────────────────────────────────────────────────────────────────
+# scripts/audit-ci-drift.mjs --remote を週次で回し、.github/adopters.json と
+# 実態 (gh search code) の drift を検出する。drift があれば既存の "ci-drift"
+# ラベル open issue にコメント、無ければ新規作成 (noise 抑制)。
+#
+# 設計: docs/audit-ci-drift-design.md F-6
+# 必要 secret: ADOPTER_NOTIFY_TOKEN (search:code + issues:write、ci-templates 自身に対して)
+#
+# 通常運用:
+#   schedule (weekly Mon 0:00 JST) で自動実行
+# 手動テスト:
+#   workflow_dispatch + dry-run=true → Issue 作成せずログのみ
+# ───────────────────────────────────────────────────────────────────────────────
+
+on:
+  schedule:
+    # 毎週月曜 0:00 JST = 日曜 15:00 UTC。release-please の活動 (主に平日昼) と
+    # ぶつけない時間帯。
+    - cron: "0 15 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "true なら Issue 作成/更新せずログのみ"
+        type: boolean
+        default: false
+      strict:
+        description: "stale-pin も hard drift 扱い (exit 1)"
+        type: boolean
+        default: false
+
+# Node.js 24 を先取り opt-in (2026-06-02 で強制移行、それ以前に互換性を検証する)。
+# 参考: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    name: Audit drift via audit-ci-drift.mjs --remote
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine token availability
+        id: token
+        env:
+          NOTIFY_TOKEN: ${{ secrets.ADOPTER_NOTIFY_TOKEN }}
+        shell: bash
+        run: |
+          if [ -n "${NOTIFY_TOKEN:-}" ]; then
+            echo "remote=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "remote=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::ADOPTER_NOTIFY_TOKEN not configured; falling back to local-mode audit (limited to this repo's checkout)."
+          fi
+
+      - name: Run audit (remote)
+        if: steps.token.outputs.remote == 'true'
+        id: audit-remote
+        env:
+          GH_TOKEN: ${{ secrets.ADOPTER_NOTIFY_TOKEN }}
+          STRICT: ${{ inputs.strict }}
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          # 配列で組むことで SC2086 を回避しつつ "$STRICT_FLAG" の空文字がそのまま
+          # node 側の余計な argv にならないようにする。
+          ARGS=(--remote --json-out=drift.json)
+          if [ "${STRICT:-false}" = "true" ]; then ARGS+=(--strict); fi
+          node scripts/audit-ci-drift.mjs "${ARGS[@]}" | tee audit-report.md
+
+      - name: Run audit (local fallback)
+        if: steps.token.outputs.remote == 'false'
+        id: audit-local
+        env:
+          STRICT: ${{ inputs.strict }}
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          ARGS=(--json-out=drift.json)
+          if [ "${STRICT:-false}" = "true" ]; then ARGS+=(--strict); fi
+          node scripts/audit-ci-drift.mjs "${ARGS[@]}" | tee audit-report.md
+
+      - name: Determine drift presence
+        id: drift
+        env:
+          REMOTE_EXIT: ${{ steps.audit-remote.outcome }}
+          LOCAL_EXIT: ${{ steps.audit-local.outcome }}
+        shell: bash
+        run: |
+          # outcome は success/failure (script の exit code を反映)。failure = drift あり。
+          if [ "$REMOTE_EXIT" = "failure" ] || [ "$LOCAL_EXIT" = "failure" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or update drift issue
+        if: steps.drift.outputs.found == 'true' && !inputs.dry_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPORT=$(cat audit-report.md)
+          TODAY=$(date -u +%Y-%m-%d)
+          TITLE="adopters.json drift detected ($TODAY)"
+          # 既存の open "ci-drift" issue を探す
+          existing=$(gh issue list --label ci-drift --state open --json number -q '.[0].number' || true)
+          BODY_FILE=$(mktemp)
+          {
+            echo "_自動投稿: audit-drift workflow ($RUN_URL)_"
+            echo ""
+            echo "$REPORT"
+            echo ""
+            echo "---"
+            echo ""
+            echo "対処手順:"
+            echo "1. \`node scripts/audit-ci-drift.mjs\` で手元再現"
+            echo "2. \`.github/adopters.json\` を実態に合わせて更新"
+            echo "3. README 採用状況テーブルも同 PR で更新"
+            echo "4. このリポへ PR → マージ → drift 解消後 issue を close"
+          } > "$BODY_FILE"
+
+          # ラベルが未作成なら冪等 create
+          if ! gh label list --json name -q '.[].name' | grep -qx "ci-drift"; then
+            gh label create ci-drift --color "D93F0B" \
+              --description "adopters.json と実態の drift を検出" || true
+          fi
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file "$BODY_FILE"
+            echo "Commented on existing issue #$existing"
+          else
+            gh issue create \
+              --title "$TITLE" \
+              --label ci-drift \
+              --body-file "$BODY_FILE"
+          fi
+
+      - name: Dry-run summary
+        if: steps.drift.outputs.found == 'true' && inputs.dry_run
+        run: |
+          {
+            echo "## 🧪 DRY RUN — drift detected but no issue created"
+            echo ""
+            cat audit-report.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: No-drift summary
+        if: steps.drift.outputs.found == 'false'
+        run: |
+          {
+            echo "## ✅ No drift detected"
+            echo ""
+            cat audit-report.md
+          } >> "$GITHUB_STEP_SUMMARY"
