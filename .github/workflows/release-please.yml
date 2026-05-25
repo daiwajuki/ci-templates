@@ -12,6 +12,9 @@ env:
 permissions:
   contents: write
   pull-requests: write
+  # release-please 自身は使わないが、notify-adopters ジョブの `gh workflow run` に
+  # actions:write が必要 (workflow_dispatch を API で trigger する権限)。
+  actions: write
 
 jobs:
   release-please:
@@ -51,3 +54,25 @@ jobs:
           echo "Moving ${FLOATING_TAG} to ${TAG_NAME}"
           git tag -f -a "${FLOATING_TAG}" -m "floating tag: latest v${MAJOR}.x" "${TAG_NAME}"
           git push origin "${FLOATING_TAG}" --force
+
+  # ─── release: published イベントは GITHUB_TOKEN 作成の Release では他 workflow を ───
+  # トリガしない GH Actions の仕様 (v0.9.0〜v0.9.3 で notify-adopters が一度も発火し
+  # ていないことを 2026-05-26 に確認)。workflow_dispatch は GITHUB_TOKEN-triggers の
+  # 例外として明示的に許可されているので、release-please から `gh workflow run` で
+  # notify-adopters.yml を直接呼ぶブリッジを置く。
+  notify-adopters:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch notify-adopters for the released tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          echo "Dispatching notify-adopters.yml for ${TAG_NAME}"
+          gh workflow run notify-adopters.yml \
+            --repo "${{ github.repository }}" \
+            --field release_tag="${TAG_NAME}" \
+            --field dry_run=false
