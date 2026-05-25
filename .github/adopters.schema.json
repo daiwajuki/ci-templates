@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/daiwajuki/ci-templates/.github/adopters.schema.json",
+  "title": "ci-templates adopters registry",
+  "description": "_ci-templates 採用側リスト。.github/workflows/notify-adopters.yml が release:published で各 repo に Issue を投稿する宛先。`uses` は Issue 本文に '採用中の reusable workflow' として展開される。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["adopters"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "_comment": { "type": "string" },
+    "adopters": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/adopter" }
+    }
+  },
+  "$defs": {
+    "adopter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repo", "uses"],
+      "properties": {
+        "repo": {
+          "type": "string",
+          "description": "GitHub repo in owner/name 形式",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*\\/[A-Za-z0-9._-]+$"
+        },
+        "uses": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "採用中の reusable workflow 名（.github/workflows/*.yml の basename から .yml を外したもの）",
+          "items": {
+            "type": "string",
+            "enum": [
+              "ci-next",
+              "ci-laravel",
+              "ci-fastapi",
+              "deploy-cloudrun-next",
+              "deploy-cloudrun-laravel",
+              "deploy-cloudrun-fastapi"
+            ]
+          }
+        },
+        "note": {
+          "type": "string",
+          "description": "任意の備考（pin が古い等のメモ用）"
+        }
+      }
+    }
+  }
+}
