@@ -24,7 +24,13 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEVELOP_DIR = path.resolve(__dirname, "..", "..");
-const PROJECTS_META = path.join(DEVELOP_DIR, "scripts", "projects-meta.json");
+// 2026-05-24 の _tools/ 移行で <DEVELOP>/scripts/projects-meta.json は
+// <DEVELOP>/_tools/data/projects-meta.json へ移動した (commit a95b48c)。
+// 旧パスは後方互換のために fallback として残す (ローカル環境差分対策)。
+const PROJECTS_META_CANDIDATES = [
+    path.join(DEVELOP_DIR, "_tools", "data", "projects-meta.json"),
+    path.join(DEVELOP_DIR, "scripts", "projects-meta.json"),
+];
 
 const argv = process.argv.slice(2);
 const REMOTE = argv.includes("--remote");
@@ -81,8 +87,24 @@ function classifySpec(spec, latestVersion) {
     return { icon: "⚠️", label: `${spec} (behind, latest ${latestVersion})` };
 }
 
+async function resolveProjectsMetaPath() {
+    for (const candidate of PROJECTS_META_CANDIDATES) {
+        try {
+            await stat(candidate);
+            return candidate;
+        } catch {
+            // try next
+        }
+    }
+    throw new Error(
+        `projects-meta.json not found. Tried:\n  - ${PROJECTS_META_CANDIDATES.join("\n  - ")}\n` +
+            "Run from a workspace that has _tools/data/projects-meta.json (current canonical location)."
+    );
+}
+
 async function main() {
-    const projectsMeta = JSON.parse(await readFile(PROJECTS_META, "utf8"));
+    const metaPath = await resolveProjectsMetaPath();
+    const projectsMeta = JSON.parse(await readFile(metaPath, "utf8"));
     const latest = {};
     for (const [pkgName, pkgDir] of Object.entries(PACKAGES)) {
         latest[pkgName] = await getLatestVersion(pkgDir);
