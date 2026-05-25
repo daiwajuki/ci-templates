@@ -1,8 +1,9 @@
 # audit-ci-drift 設計と実装
 
-> **ステータス**: F-1 実装済み (案 A 採用、PAT 方式で開始)。実装は
-> [.github/workflows/notify-adopters.yml](../.github/workflows/notify-adopters.yml) と
-> [.github/adopters.json](../.github/adopters.json) に存在。本ドキュメントは設計判断の記録と運用手順を兼ねる。
+> **ステータス**: F-1 (push 通知) 実装済み、F-5 (drift 検出 script) も実装済み。実装は
+> [.github/workflows/notify-adopters.yml](../.github/workflows/notify-adopters.yml) /
+> [.github/adopters.json](../.github/adopters.json) /
+> [scripts/audit-ci-drift.mjs](../scripts/audit-ci-drift.mjs) に存在。本ドキュメントは設計判断の記録と運用手順を兼ねる。
 
 `@v0` floating tag を pin している採用側プロジェクト（現在 4、目標 14）に対し、
 **`v0` の指す SHA が変わった = 新リリースが降ってきた**ことを知らせる仕組み。
@@ -158,7 +159,7 @@ EOF
 ## 既知の限界
 
 - **採用側の actual usage（どの workflow を `@v0` で引いているか）はリストに依存**。実態と乖離する可能性。
-  - 補完案: 各リリースで daiwajuki org の repo を `gh search code 'daiwajuki/ci-templates' --owner=daiwajuki` で抽出して `adopters.json` の差分を検出する補助 workflow を別途用意
+  - **対応 (F-5 実装済み)**: [scripts/audit-ci-drift.mjs](../scripts/audit-ci-drift.mjs) が `.github/adopters.json` と実態の drift を検出する。`--remote` で `gh search code "daiwajuki/ci-templates" --owner=daiwajuki --extension=yml` 経由でも動作。検出種別は missing / stale / uses-mismatch / stale-pin / unknown-workflow の 5 つ。実際に 2026-05-26 の初回ローカル実行で daiwa-ops-app / ICPSitePhotos / BidFlow / HydraulicCalculation の 4 件抜けが見つかり、commit 69f23a3 で同期した。
 - **Issue 通知が見られなければ意味がない**。各採用側の通知設定（Email / Slack 連携）次第。
   - 補完案: 採用側 repo に Slack 通知 GitHub App を install してもらう運用を別途規定
 
@@ -176,6 +177,8 @@ EOF
 | F-2 | `ADOPTER_NOTIFY_TOKEN` を発行・`scripts/deploy-secrets.mjs` で各 adopter repo に配備 | ⏭️ 運用判断 (本実装 PR 後) |
 | F-3 | 初回 release で本番有効化 | ⏭️ F-2 後 |
 | F-4 | 14 採用達成時点で GitHub App 化 (PAT 廃止) | ⏭️ 採用数次第 |
+| F-5 | drift 検出 script (`scripts/audit-ci-drift.mjs`) — local / remote 両モード、missing/stale/uses-mismatch/stale-pin/unknown-workflow を検出 | ✅ 実装済み |
+| F-6 | nightly workflow で `audit-ci-drift --remote` を回し、drift 検出時に Issue 投稿 or PR 作成 | ⏭️ F-5 の運用フィードバック後 |
 
 ### 設計判断 (F-1 実装で確定したもの)
 

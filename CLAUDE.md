@@ -147,6 +147,7 @@ deploy 系は actionlint だけで保護されている。本物の deploy 検�
 | `build-adoption-snapshot.mjs` | `snapshot-adoption.yml` (nightly) / ローカル | 全プロジェクトの `@daiwajuki/*` 採用バージョンを集計、Markdown + JSON 出力。`_tools/data/projects-meta.json` をワークスペース直下から読む（リポ内に sync copy がある前提） |
 | `deploy-secrets.mjs` | ローカル / メンテナ運用 | 14 プロジェクトへの secret 一括配備 (`gh secret set --org` の fanout)。`GH_PACKAGES_TOKEN` / `AUTH_REPO_TOKEN` / `DS_REPO_TOKEN` のローテに使う |
 | `show-legacy-peer-deps-status.mjs` | ローカル / メンテナ運用 | 各 consumer の `.npmrc` から `legacy-peer-deps=true` 残置を一覧化。Wave E（peer-deps 卒業）の exit decision 判定用 |
+| `audit-ci-drift.mjs` | ローカル / メンテナ運用 / CI (将来) | `.github/adopters.json` と実態の drift を検出 (missing / stale / uses-mismatch / stale-pin / unknown-workflow)。`--remote` で `gh search code` を使い org 全体をスキャン、`--strict` で stale-pin も exit 1 扱い |
 
 ### 設定ファイル
 
@@ -182,4 +183,5 @@ deploy 系は actionlint だけで保護されている。本物の deploy 検�
 | 新 fixture を追加する | 最小構成は `fixtures/minimal-next/package.json` 参考（`scripts.lint = "echo 'lint ok'"` のようなダミーで OK）。CI 通過の事実だけ確認すれば良い |
 | 新 Dockerfile variant を足す | `dockerfiles/<stack>/Dockerfile.<variant>` を追加 → `scripts/sync-templates.mjs` の variant マップに登録 → `docs/usage-sync-templates.md` 更新 → `feat:` でコミット |
 | 14 プロジェクトの採用バージョンを今すぐ見たい | `node scripts/build-adoption-snapshot.mjs`（ローカル）または GitHub Actions の Snapshot Adoption workflow を `workflow_dispatch` |
+| adopters.json と実態の drift を確認したい | `node scripts/audit-ci-drift.mjs`（ローカル、workspace 直下を grep）/ `--remote` で `gh search code` 経由 / `--strict` で stale-pin も exit 1 |
 | secret 配備状況を確認したい | `gh auth status` で daiwajuki org ログイン後、`node scripts/audit-secrets.mjs` |
