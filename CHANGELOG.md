@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.3](https://github.com/daiwajuki/ci-templates/compare/v0.9.2...v0.9.3) (2026-05-25)
+
+
+### Fixed
+
+* **deploy-next:** drop packages:read from reusable permissions ([#39](https://github.com/daiwajuki/ci-templates/issues/39)) ([912f9b3](https://github.com/daiwajuki/ci-templates/commit/912f9b302f2f28f058e974bf7b9aa2bb3f09b7b7))
+
 ## [0.9.2](https://github.com/daiwajuki/ci-templates/compare/v0.9.1...v0.9.2) (2026-05-24)
 
 
