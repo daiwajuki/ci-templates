@@ -37,4 +37,4 @@ template 内の `# CUSTOMIZE:` コメント箇所:
 ## 関連
 
 - 使い方: [../../docs/usage-sync-templates.md](../../docs/usage-sync-templates.md)
-- ワークスペース全体のポート規約: [../../../scripts/ports.json](../../../scripts/ports.json)
+- ワークスペース全体のポート規約: [../../../_tools/data/ports.json](../../../_tools/data/ports.json)
