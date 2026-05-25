@@ -78,13 +78,14 @@ jobs:
 | `colocate-ref` | string | `''` | colocate-repo の ref |
 | `colocate-path` | string | `''` | 配置先（リポジトリルートからの相対パス）|
 | `additional-build-context-repos` | string | `''` | v0.7+ — BuildKit additional contexts に渡す追加 repo（改行区切り `name=owner/repo[@ref]`、image モードのみ）|
+| `build-args` | string | `''` | image モード時に Dockerfile へ渡す追加 build-arg（`KEY=VALUE` 改行区切り）。`GH_PACKAGES_TOKEN` は workflow 内で自動 prepend されるので明示不要。**機密値はここではなく `secrets-yaml` 経由 (Secret Manager) を推奨** — build-arg は image layer に残るため secret 用途に不向き |
 | `timeout-minutes` | number | `25` | ジョブタイムアウト |
 
 ### secrets
 
 | secret | 必須 | 説明 |
 |---|---|---|
-| `COLOCATE_TOKEN` | 任意 | colocate-repo がプライベートの場合の PAT。未指定時は `github.token`。**v0.6.0 で `colocate-token` から rename**（GitHub Actions secret 名にハイフン不可のため） |
+| `COLOCATE_TOKEN` | 任意 | colocate-repo がプライベートの場合の PAT。未指定時は `github.token`。**v0.10.0 で `colocate-token` から実質 rename** — v0.6.0 のリリースノートで rename を予告していたが YAML 反映が漏れており、`colocate-token` は GitHub Actions の制約で常に空文字評価されていた（silent broken）。今は文書通り動く |
 | `GH_PACKAGES_TOKEN` | 任意 | GitHub Packages の private dependency を取得するためのトークン (例: `@daiwajuki/ui-design`)。未指定時は `secrets.GITHUB_TOKEN` に自動フォールバック (同 owner の package まで読める)。詳細は下記「GitHub Packages 経由の private dependency」を参照 |
 | `external-checkout-token` | 任意 | v0.7+ — `additional-build-context-repos` の private repo を clone する PAT。GitHub App 方式を使うならこれは不要 |
 | `external-checkout-app-id` | 任意 | v0.7+ — GitHub App ID（推奨）。private key と組で install token を mint |

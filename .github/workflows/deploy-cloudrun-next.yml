@@ -96,8 +96,11 @@ on:
         type: string
         default: ''
     secrets:
-      colocate-token:
-        description: colocate-repo がプライベートの場合のアクセストークン（未指定時は github.token）
+      COLOCATE_TOKEN:
+        description: |
+          colocate-repo がプライベートの場合のアクセストークン（未指定時は github.token）。
+          secret 名はハイフン不可のため UPPER_SNAKE で命名 (v0.6.0 でリネームすべきだったが
+          YAML 反映漏れで v0.10.0 まで silent broken だった経緯あり)。
         required: false
       GH_PACKAGES_TOKEN:
         description: |
@@ -174,7 +177,7 @@ jobs:
         with:
           repository: ${{ inputs.colocate-repo }}
           ref: ${{ inputs.colocate-ref }}
-          token: ${{ secrets.colocate-token || github.token }}
+          token: ${{ secrets.COLOCATE_TOKEN || github.token }}
           path: ${{ inputs.colocate-path }}
 
       - name: Validate WIF configuration
