@@ -167,24 +167,28 @@ _ci-templates/
 | **E** | 残り 12 プロジェクトに横展開・FastAPI / Laravel 用 CI 追加 | 🚧 進行中（6/18 採用、CI/Deploy 6 種公開済み） |
 | **F** | release-please / Renovate 配給・`audit-ci-drift.mjs` 有効化 | 🚧 進行中（release-please 完了、audit-ci-drift は [設計済み](docs/audit-ci-drift-design.md)、Renovate 配給方式は未定） |
 
-## 採用状況（最終確認: 2026-05-10）
+## 採用状況（最終確認: 2026-05-26）
 
-各プロジェクトの `.github/workflows/*.yml` に `daiwajuki/ci-templates` の `uses:` を持つかで実測（全 18 プロジェクト中 6 件採用）：
+各プロジェクトの `.github/workflows/*.yml` に `daiwajuki/ci-templates` の `uses:` を持つかで実測（全 18 プロジェクト中 8 件採用）：
 
-| プロジェクト | 状態 | 採用 workflow | 備考 |
-|---|---|---|---|
-| Portal | ✅ 採用済み | ci.yml, deploy.yml | Phase B（試験導入） |
-| ICPCostHub | ✅ 採用済み | ci.yml, deploy-api.yml, deploy-web.yml | Phase E 横展開 |
-| ICPEstimating | ✅ 採用済み | deploy-api.yml, deploy-web.yml | Phase E 横展開（CI は別途） |
-| PayrollManager | ✅ 採用済み | ci.yml | Phase E 横展開 |
-| BidFlow | ✅ 採用済み | （要確認） | Phase E 横展開 |
-| HydraulicCalculation | ✅ 採用済み | （要確認） | Phase E 横展開 |
-| 残り 12 | ⏳ 未採用 | — | Phase E で順次横展開（BidCalc / BuildDeck / CompanyWebsite / ContractHub / DailyLogs / genba-chosa / ICPBlankMap / ICPContacts / ICPForms / ICPSitePhotos / Orders / StridePlan） |
+| プロジェクト | 状態 | 採用 workflow（reusable 名） | pin | 備考 |
+|---|---|---|---|---|
+| Portal | ✅ 採用済み | ci-next, deploy-cloudrun-next | `@v0` | Phase B（試験導入） |
+| ICPCostHub | ✅ 採用済み | deploy-cloudrun-next, deploy-cloudrun-laravel | `@v0` | Phase E（CI は別途、ci-templates 経由ではない） |
+| ICPEstimating | ✅ 採用済み | deploy-cloudrun-next, deploy-cloudrun-laravel | `@v0` | Phase E |
+| PayrollManager | ✅ 採用済み | ci-next | `@v0` | Phase E |
+| BidFlow | ✅ 採用済み | ci-fastapi, deploy-cloudrun-next, deploy-cloudrun-fastapi | `@v0` | Phase E |
+| HydraulicCalculation | ✅ 採用済み | ci-next, deploy-cloudrun-next | `@v0` | Phase E |
+| daiwa-ops-app | ✅ 採用済み | ci-next, deploy-cloudrun-next | `@v0` | Phase E |
+| ICPSitePhotos | ⚠️ 採用済み（古い pin） | ci-next | `@v0.6.0` | floating tag への切替推奨。v0.7.0+ の hardening を受け取れていない |
+| 残り 10 | ⏳ 未採用 | — | — | Phase E で順次横展開（BidCalc / BuildDeck / CompanyWebsite / ContractHub / DailyLogs / genba-chosa / ICPBlankMap / ICPContacts / ICPForms / Orders / StridePlan） |
 
 確認コマンド:
 ```bash
-grep -rl 'daiwajuki/ci-templates' */.github/workflows/
+grep -rn 'daiwajuki/ci-templates' ../*/.github/workflows/*.yml
 ```
+
+> `.github/adopters.json` は [notify-adopters.yml](.github/workflows/notify-adopters.yml) の宛先正本。このテーブルと乖離させない。
 
 ## 取り込みチェックリスト
 
