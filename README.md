@@ -141,6 +141,7 @@ _ci-templates/
 │   ├── usage-deploy-laravel.md
 │   ├── usage-deploy-fastapi.md
 │   ├── usage-sync-templates.md            # ★ Phase C: sync-templates CLI 使い方
+│   ├── oauth-setup.md                     # Workspace 共有 OAuth + Secret Manager 連携手順
 │   ├── versioning.md
 │   └── audit-ci-drift-design.md           # Phase F 設計 + F-1 実装記録
 ├── fixtures/

@@ -90,6 +90,30 @@ jobs:
 | `external-checkout-app-id` | 任意 | v0.7+ — GitHub App ID（推奨）。private key と組で install token を mint |
 | `external-checkout-app-private-key` | 任意 | v0.7+ — GitHub App private key (PEM)。app-id と組で必須 |
 
+## Workspace 共有 OAuth (推奨パターン)
+
+`@daiwajuki/auth` を使う SaaS は **同じ Google OAuth Client を 19 SaaS で共有** する設計。
+Cloud Run 側は `secrets-yaml` で Secret Manager の `workspace-google-*` を参照する:
+
+```yaml
+jobs:
+    deploy:
+        uses: daiwajuki/ci-templates/.github/workflows/deploy-cloudrun-next.yml@v0
+        with:
+            service-name: portal-web
+            source-path: ./web
+            secrets-yaml: |
+                GOOGLE_CLIENT_ID=workspace-google-client-id:latest
+                GOOGLE_CLIENT_SECRET=workspace-google-client-secret:latest
+                AUTH_SECRET=workspace-auth-secret:latest
+                MFA_ENCRYPTION_KEY=workspace-mfa-encryption-key:latest
+            env-vars: |
+                AUTH_URL=https://portal-web-xxxxxx.run.app
+```
+
+Secret Manager の事前作成 / Cloud Run サービスアカウントへの read 権限付与は
+[docs/oauth-setup.md](./oauth-setup.md) を参照。
+
 ## なぜ smoke で 200/302/307 を許容するか
 
 Next.js の認証ミドルウェア（`middleware.ts`）が未認証アクセスを `/login` に 307 リダイレクトする実装が多いため、ルート `/` にアクセスして 200 が返るとは限らない。`200 / 302 / 307` のいずれかが返れば「サーバが起動している」と判定する。
