@@ -42,7 +42,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
 const DEVELOP_DIR = path.resolve(REPO_ROOT, "..");
-const PROJECTS_META = path.join(DEVELOP_DIR, "scripts", "projects-meta.json");
+const PROJECTS_META = path.join(DEVELOP_DIR, "_tools", "data", "projects-meta.json");
 const OUTPUT_MD = path.join(REPO_ROOT, "docs", "peer-deps-status.md");
 
 // ─── args ─────────────────────────────────────────────────────────────────────
