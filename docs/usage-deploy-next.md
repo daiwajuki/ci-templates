@@ -121,6 +121,29 @@ caller の repository に以下を設定：
 ### Secrets（任意）
 - `DS_REPO_TOKEN` — `_design-system` を colocate-repo として使う場合の PAT（Contents: Read-only）
 
+### caller 側の permissions
+
+reusable workflow を呼ぶ caller workflow には最低限以下が必要：
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+```
+
+**GitHub Packages を `github.token` 経由で install したい場合**は `packages: read` も追加：
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+  packages: read   # ← github.token で @daiwajuki/* 等を読む場合のみ
+```
+
+PAT (`GH_PACKAGES_TOKEN` org secret) を使うフローでは `packages: read` は不要。
+
+> 📌 **v0.9.3 で修正:** v0.6.0〜v0.9.2 では reusable workflow 側が `packages: read` を要求していたため、caller がこれを granting していないと **startup_failure で 0 job のまま即終了** した（GitHub Actions の reusable workflow permissions 仕様）。v0.9.3 でテンプレートから外したため `@v0` 追従なら自動修復。
+
 ## GitHub Packages 経由の private dependency
 
 `@daiwajuki/ui-design` / `@daiwajuki/auth` 等を GitHub Packages から取得する場合の前提。
