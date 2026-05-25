@@ -54,14 +54,31 @@ jobs:
         shell: bash
         run: |
           if [ -n "${NOTIFY_TOKEN:-}" ]; then
-            echo "remote=true" >> "$GITHUB_OUTPUT"
+            echo "available=true" >> "$GITHUB_OUTPUT"
           else
-            echo "remote=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::ADOPTER_NOTIFY_TOKEN not configured; falling back to local-mode audit (limited to this repo's checkout)."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            # CI 環境で local fallback を使うと DEVELOP_DIR 配下に他リポが無いため
+            # 全 adopter が stale 扱いの誤検知になる (false positive)。よって audit
+            # 自体を skip する。手元で確認したいときは `node scripts/audit-ci-drift.mjs`
+            # を直接実行する (workspace 直下に他リポが checkout されている前提)。
+            {
+              echo "## ⚠️ Audit skipped"
+              echo ""
+              echo "\`ADOPTER_NOTIFY_TOKEN\` is not configured. CI cannot run remote scan"
+              echo "(gh search code on daiwajuki org repos requires a PAT)."
+              echo ""
+              echo "Local fallback is intentionally disabled in CI because the runner's"
+              echo "workspace contains only this checkout, which would cause every adopter"
+              echo "to be reported as \`stale\` (false positive)."
+              echo ""
+              echo "To enable: provision a fine-grained PAT with \`metadata:read\` over"
+              echo "daiwajuki org repos and store it as the \`ADOPTER_NOTIFY_TOKEN\` secret."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::ADOPTER_NOTIFY_TOKEN not configured; audit skipped (see job summary)."
           fi
 
       - name: Run audit (remote)
-        if: steps.token.outputs.remote == 'true'
+        if: steps.token.outputs.available == 'true'
         id: audit-remote
         env:
           GH_TOKEN: ${{ secrets.ADOPTER_NOTIFY_TOKEN }}
@@ -70,22 +87,9 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          # 配列で組むことで SC2086 を回避しつつ "$STRICT_FLAG" の空文字がそのまま
-          # node 側の余計な argv にならないようにする。
+          # 配列で組むことで SC2086 を回避しつつ STRICT 未指定時に空 argv が
+          # node 側に渡らないようにする。
           ARGS=(--remote --json-out=drift.json)
-          if [ "${STRICT:-false}" = "true" ]; then ARGS+=(--strict); fi
-          node scripts/audit-ci-drift.mjs "${ARGS[@]}" | tee audit-report.md
-
-      - name: Run audit (local fallback)
-        if: steps.token.outputs.remote == 'false'
-        id: audit-local
-        env:
-          STRICT: ${{ inputs.strict }}
-        shell: bash
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          ARGS=(--json-out=drift.json)
           if [ "${STRICT:-false}" = "true" ]; then ARGS+=(--strict); fi
           node scripts/audit-ci-drift.mjs "${ARGS[@]}" | tee audit-report.md
 
@@ -93,11 +97,11 @@ jobs:
         id: drift
         env:
           REMOTE_EXIT: ${{ steps.audit-remote.outcome }}
-          LOCAL_EXIT: ${{ steps.audit-local.outcome }}
         shell: bash
         run: |
           # outcome は success/failure (script の exit code を反映)。failure = drift あり。
-          if [ "$REMOTE_EXIT" = "failure" ] || [ "$LOCAL_EXIT" = "failure" ]; then
+          # token 不在で audit-remote が skipped (空文字) の場合は drift 判定なし扱い。
+          if [ "$REMOTE_EXIT" = "failure" ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
@@ -157,7 +161,9 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: No-drift summary
-        if: steps.drift.outputs.found == 'false'
+        # audit-remote が success の時のみ "no drift" を表示 (token 不在で skip した
+        # ケースを no-drift と誤って報告しないため)。
+        if: steps.drift.outputs.found == 'false' && steps.audit-remote.outcome == 'success'
         run: |
           {
             echo "## ✅ No drift detected"
