@@ -124,10 +124,15 @@ on:
           install 先 repo + contents:read 権限が必要。
         required: false
 
+# 注: ここでは packages: read を要求しない。reusable workflow の permissions が
+# caller の permissions の super-set になると GitHub Actions は startup_failure で
+# 0 job のまま即終了するため (v0.6.0〜v0.9.2 で発生した next スタック全採用の事故)。
+# GitHub Packages を github.token で読みたい caller は自分の permissions に
+# packages: read を足す。PAT (GH_PACKAGES_TOKEN) 利用時は permissions 不要。
+# 詳細は docs/usage-deploy-next.md の「caller 側の permissions」セクションを参照。
 permissions:
   contents: read
   id-token: write
-  packages: read
 
 jobs:
   deploy:
