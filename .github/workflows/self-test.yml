@@ -17,6 +17,16 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
 
+      - name: Validate adopters.json against schema
+        # adopters.json は notify-adopters.yml が release: published で読む正本。
+        # uses 配列の typo (e.g. "deploy-cloudrun-nextjs") は schema enum で弾く。
+        # 新 reusable workflow を足したら schema の enum も同 PR で更新する必要がある。
+        run: |
+          npx --yes ajv-cli@5 validate \
+            --spec=draft2020 \
+            -s .github/adopters.schema.json \
+            -d .github/adopters.json
+
   test-ci-next:
     name: Test ci-next.yml (minimal fixture)
     needs: lint-workflows

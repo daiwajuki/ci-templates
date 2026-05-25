@@ -171,7 +171,7 @@ deploy 系は actionlint だけで保護されている。本物の deploy 検�
 
 | やりたいこと | 起点 |
 |---|---|
-| 新 reusable workflow を足す | YAML 追加 → 同 PR で fixture と self-test job 追加 → `feat:` でコミット |
+| 新 reusable workflow を足す | YAML 追加 → 同 PR で fixture と self-test job 追加 → [`.github/adopters.schema.json`](.github/adopters.schema.json) の `uses` enum にも追加（self-test の schema 検証 step が壊れるので忘れない）→ `feat:` でコミット |
 | 既存 workflow にオプション input を足す（後方互換） | `feat:` でコミット → MINOR bump |
 | input/secret の rename・型変更 | `feat!:` でコミット → MINOR bump（v0.x 特例）。CHANGELOG に Before/After 移行手順を必ず書く |
 | バグ修正（呼び出し側に変更を強いない） | `fix:` でコミット → PATCH bump |
