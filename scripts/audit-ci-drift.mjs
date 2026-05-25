@@ -114,47 +114,92 @@ async function scanLocal() {
 }
 
 async function scanRemote() {
-    // gh search code は raw コンテンツを返さないので、ヒットした path を repo 単位で集約し、
-    // 個別に gh api で内容を取得して USES_PATTERN を回す。
+    // 当初 `gh search code` を使ったが、GitHub Code Search API は **private repo を
+    // index しない** (org の plan に関係なく /search/code エンドポイントで返らない)
+    // ため 0 件しか取れず false positive で全 adopter が stale 扱いになる事象を確認
+    // (2026-05-25 token 配備後の初回 dry-run)。
+    //
+    // 代わりに以下を実行：
+    //  1. /orgs/daiwajuki/repos で org の全 repo を列挙 (private 含む)
+    //  2. 各 repo の .github/workflows ディレクトリ contents を取得
+    //  3. 各 yml/yaml を contents API で取得 → USES_PATTERN を回す
+    //
+    // PAT に必要な権限：Metadata:read (repo 列挙)、Contents:read (file 取得)。
     /** @type {Map<string, RepoActual>} */
     const repos = new Map();
-    let hits;
+
+    // org の repo 一覧 (archived 含む。後で archived は対象から外す)。
+    // 注: gh api の `-q` jq フィルタは Windows execSync で path 解釈されることが
+    // あるため (`.[]` の leading `.` がファイル解決に走る)、jq は使わず生 JSON を
+    // node 側でパースする。
+    // 注: gh api `--paginate` は Windows execSync で空文字を返す (stderr 経由の
+    // pagination メッセージで stdio バッファが詰まる挙動と思われる)。
+    // per_page=100 で全 repo (現状 21 件) が取得できるため --paginate は使わない。
+    // 100 件超になったら page=2 を明示ループする実装に切り替える。
+    let allRepos = [];
     try {
         const raw = execSync(
-            `gh search code "daiwajuki/ci-templates" --owner=daiwajuki --extension=yml --limit=100 --json repository,path`,
+            `gh api orgs/daiwajuki/repos?per_page=100`,
             { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
         );
-        hits = JSON.parse(raw);
+        allRepos = JSON.parse(raw);
+        if (allRepos.length === 100) {
+            console.error(
+                "::warning::org has 100+ repos; pagination not implemented yet, results may be incomplete"
+            );
+        }
     } catch (err) {
-        console.error(`gh search code failed: ${err.message}`);
+        console.error(`Failed to list daiwajuki org repos: ${err.message}`);
         process.exit(2);
     }
-    for (const hit of hits) {
-        const repo = hit.repository.nameWithOwner;
-        if (repo === "daiwajuki/ci-templates") continue;
-        let content;
+
+    for (const r of allRepos) {
+        if (r.name === "ci-templates") continue;
+        if (r.archived) continue;
+        const repoFull = `daiwajuki/${r.name}`;
+        // workflows ディレクトリの contents (404 はスキップ = workflows 無し)。
+        // 注: `2>/dev/null || true` 風の shell トリックは Windows execSync で
+        // 期待通り動かないため、try/catch で 404 を吸収する。
+        let entries;
         try {
-            const b64 = execSync(
-                `gh api repos/${repo}/contents/${hit.path} -q .content`,
+            const raw = execSync(
+                `gh api repos/${repoFull}/contents/.github/workflows`,
                 { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
             );
-            content = Buffer.from(b64, "base64").toString("utf8");
+            entries = JSON.parse(raw);
+            if (!Array.isArray(entries)) continue;
         } catch {
             continue;
         }
-        for (const m of content.matchAll(USES_PATTERN)) {
-            const [, name, ref] = m;
-            let actual = repos.get(repo);
-            if (!actual) {
-                actual = { repo, usages: new Map() };
-                repos.set(repo, actual);
+        for (const entry of entries) {
+            if (entry.type !== "file") continue;
+            if (!entry.name.endsWith(".yml") && !entry.name.endsWith(".yaml")) continue;
+            let content;
+            try {
+                // -q を避けるため生 JSON を取得 → node 側で base64 デコード
+                const raw = execSync(
+                    `gh api repos/${repoFull}/contents/.github/workflows/${entry.name}`,
+                    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
+                );
+                const fileJson = JSON.parse(raw);
+                content = Buffer.from(fileJson.content || "", "base64").toString("utf8");
+            } catch {
+                continue;
             }
-            let usage = actual.usages.get(name);
-            if (!usage) {
-                usage = { name, refs: new Set() };
-                actual.usages.set(name, usage);
+            for (const m of content.matchAll(USES_PATTERN)) {
+                const [, name, ref] = m;
+                let actual = repos.get(repoFull);
+                if (!actual) {
+                    actual = { repo: repoFull, usages: new Map() };
+                    repos.set(repoFull, actual);
+                }
+                let usage = actual.usages.get(name);
+                if (!usage) {
+                    usage = { name, refs: new Set() };
+                    actual.usages.set(name, usage);
+                }
+                usage.refs.add(ref);
             }
-            usage.refs.add(ref);
         }
     }
     return repos;
@@ -336,7 +381,7 @@ async function main() {
     const adopters = await loadAdopters();
     const actual = REMOTE ? await scanRemote() : await scanLocal();
     const drift = diff(adopters, actual);
-    const md = renderMarkdown(drift, REMOTE ? "remote (gh search code)" : "local (DEVELOP_DIR)");
+    const md = renderMarkdown(drift, REMOTE ? "remote (gh api contents)" : "local (DEVELOP_DIR)");
     process.stdout.write(md);
 
     if (JSON_OUT) {
