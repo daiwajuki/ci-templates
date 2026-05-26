@@ -63,24 +63,33 @@ GitHub Actions の制約。`colocate-token` は **空文字に評価される** 
 
 採用側は `@v0` を pin している。SHA は **release-please が動かす前提**。手動で動かさない。途中で repo を作り直したり tag を消したりすると採用側全部の CI が壊れる。
 
-### GitHub Packages cross-repo 認証は org secret `GH_PACKAGES_TOKEN` が前提
+### GitHub Free プラン制約: org-level secret は private repo に届かない（2026-05-26 確定）
 
-`@daiwajuki/auth` や `@daiwajuki/ui-design` のような **publish 元と install 元が別リポジトリ** の private package は、GitHub Actions の `github.token` / `secrets.GITHUB_TOKEN` では **403 になる**（`packages: read` permission を付けても解決しない、これは GitHub Packages の仕様）。
+**daiwajuki org は GitHub Free for Organizations プラン**。この制約下で:
 
-解決構造：
-1. org `daiwajuki` レベルに **`GH_PACKAGES_TOKEN`** secret（`read:packages` 権限の PAT、All repositories アクセス）を 1 個用意
-2. reusable workflow 側は `secrets.GH_PACKAGES_TOKEN || github.token` でフォールバック（same-repo は github.token で動くため）
-3. **採用側は `secrets: inherit`** を必ず付ける（これがないと org secret が reusable workflow に届かない）
+> "Organization secrets cannot be used by private repositories with your plan."
 
-採用側 README / docs に「`secrets: inherit` 必須」を必ず明記する。過去事例: Portal CI が 5 連続失敗（v0.5.0 リリース時の 0.4.x 系試行錯誤）。
+`visibility: all` であっても **private repo の workflow context には配信されない**。診断 commit (`secrets context` を JSON 化して確認) で 2026-05-26 確定。
 
-### cross-repo checkout は GitHub App credentials を第一選択に
+結論: 14 consumer 全部が private のため、**org-level secret 戦略は破綻**。代替として:
 
-`deploy-cloudrun-laravel.yml` の `additional-build-context-repos` のように **別 repo を BuildKit context へ注入** する場合、認証は以下の優先順で解決される:
+1. **GitHub App credentials** (`daiwajuki-cross-repo-checkout` app_id: 3820205) を repo-level secret に配備し `actions/create-github-app-token@v1` で installation token を mint - **これが現在の標準**
+2. または PAT 値を repo-level secret に直接 fanout（CompanyWebsite / ICPSitePhotos がこのパターンで稼働中）
+3. GitHub Packages の `@daiwajuki/*` install は `github.token` + `permissions: packages: read` でフォールバック動作（reusable workflow 側で実装済み）
 
-1. `external-checkout-app-id` + `external-checkout-app-private-key`（**推奨**: `actions/create-github-app-token` で install token を mint。短命・権限境界が明確）
-2. `external-checkout-token`（PAT。後方互換のため残置）
-3. `github.token`（fallback。同 repo・public のみ。private cross-repo は 403）
+詳細は [docs/secrets.md](docs/secrets.md) の「GitHub Free プラン制約」セクション参照。
+
+**採用側は `secrets: inherit` を引き続き必須**（org secret が無くなっても `GITHUB_TOKEN` の継承や将来の repo-level org-replicated secret のために必要）。過去事例: Portal CI が `secrets: inherit` 欠落で 5 連続失敗（v0.5.0 リリース時の試行錯誤期）。
+
+### cross-repo checkout は GitHub App credentials が標準（2026-05-26 v2 以降）
+
+Free プラン制約で org-level PAT が機能しないため、**GitHub App 認証が事実上の唯一の選択肢**。優先順位:
+
+1. **GitHub App** (`DAIWAJUKI_APP_ID` + `DAIWAJUKI_APP_PRIVATE_KEY`、`actions/create-github-app-token@v1` で mint): **標準パターン**。短命・権限境界明確。`daiwajuki-cross-repo-checkout` App (app_id: 3820205) を流用。2026-05-26 時点で 7/14 consumer 採用
+2. **repo-level PAT** (`DS_REPO_TOKEN` / `ORG_REPO_TOKEN` 等を repo-level secret に直接配備): CompanyWebsite / ICPSitePhotos の 2 件のみ残存、順次 App へ移行予定
+3. `github.token`（fallback。**daiwajuki org 内 cross-repo は 403**、同 repo・public のみ）
+
+`deploy-cloudrun-laravel.yml` の `additional-build-context-repos` の入力名は `external-checkout-app-id` / `external-checkout-app-private-key` だが、採用側 secret 名は `DAIWAJUKI_APP_*` で配備し `with:` で mapping する（ICPCostHub の deploy-api.yml 参照）。
 
 新規 deploy 系 workflow に cross-repo checkout を足す場合は **同じ優先順を踏襲**する（`fastapi` / `next` 版への展開は Phase 3 で予定、commit 1d992a4 参照）。
 
