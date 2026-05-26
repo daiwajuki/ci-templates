@@ -143,9 +143,9 @@ deploy 系は actionlint だけで保護されている。本物の deploy 検�
 |---|---|---|
 | `sync-templates.mjs` | 採用側プロジェクト | GitHub raw URL から Dockerfile / compose を fetch してコピー。`.ci-templates.json` に履歴記録 |
 | `swap-deps-to-registry.mjs` | 採用側 CI（build 直前、commit しない） | `package.json` の `"@daiwajuki/X": "file:../_X"` を `"^X.Y.Z"` に書き換え。GitHub Packages から install させる |
-| `audit-secrets.mjs` | ローカル / メンテナ運用 | `gh secret list` で 14 プロジェクトの `GH_PACKAGES_TOKEN` / `AUTH_REPO_TOKEN` / `DS_REPO_TOKEN` 配備状況を Markdown 表で監査 |
+| `audit-secrets.mjs` | ローカル / メンテナ運用 | `gh secret list` で 14 プロジェクトの `ORG_REPO_TOKEN` / `DAIWAJUKI_APP_ID` / `DS_REPO_TOKEN`（旧、残置検知用）配備状況を Markdown 表で監査。docs/secrets.md と命名を揃えること |
 | `build-adoption-snapshot.mjs` | `snapshot-adoption.yml` (nightly) / ローカル | 全プロジェクトの `@daiwajuki/*` 採用バージョンを集計、Markdown + JSON 出力。`_tools/data/projects-meta.json` をワークスペース直下から読む（リポ内に sync copy がある前提） |
-| `deploy-secrets.mjs` | ローカル / メンテナ運用 | 14 プロジェクトへの secret 一括配備 (`gh secret set --org` の fanout)。`GH_PACKAGES_TOKEN` / `AUTH_REPO_TOKEN` / `DS_REPO_TOKEN` のローテに使う |
+| `deploy-secrets.mjs` | ローカル / メンテナ運用 | 14 プロジェクトへの secret 一括配備 (`gh secret set --org` の fanout)。`ORG_REPO_TOKEN`（org-level）/ `DAIWAJUKI_APP_ID` / `DAIWAJUKI_APP_PRIVATE_KEY`（App credentials、推奨）のローテに使う |
 | `show-legacy-peer-deps-status.mjs` | ローカル / メンテナ運用 | 各 consumer の `.npmrc` から `legacy-peer-deps=true` 残置を一覧化。Wave E（peer-deps 卒業）の exit decision 判定用 |
 | `audit-ci-drift.mjs` | ローカル / メンテナ運用 / CI (将来) | `.github/adopters.json` と実態の drift を検出 (missing / stale / uses-mismatch / stale-pin / unknown-workflow)。`--remote` で `gh search code` を使い org 全体をスキャン、`--strict` で stale-pin も exit 1 扱い |
 
