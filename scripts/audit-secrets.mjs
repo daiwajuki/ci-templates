@@ -33,14 +33,9 @@ const PROJECTS_META = path.join(DEVELOP_DIR, "_tools", "data", "projects-meta.js
 
 const JSON_OUTPUT = process.argv.includes("--json");
 
-// 各 secret の必要性: 全プロジェクトに必要 / authMode が "todo" 以外なら必要 / 任意
-// 2026-05-26 v2: GitHub Free プラン制約発見 + App 移行で標準パターン確定
-const SECRETS_NEEDED = {
-    DAIWAJUKI_APP_ID: { scope: "repo", required: true, note: "[標準] GitHub App `daiwajuki-cross-repo-checkout` の app-id" },
-    DAIWAJUKI_APP_PRIVATE_KEY: { scope: "repo", required: true, note: "[標準] 同 App の private key PEM" },
-    DS_REPO_TOKEN: { scope: "repo", required: false, note: "[非推奨/旧] 個人 repo 時代の PAT。本日 App 移行で workflow 参照は全廃。secret 本体の削除待ち" },
-    ORG_REPO_TOKEN: { scope: "repo", required: false, note: "[非推奨] ICPSitePhotos のみ repo-level で稼働 (PAT 流用)。App 移行後に削除" },
-};
+// 監査対象 secret 名は本体で直接参照: DAIWAJUKI_APP_ID / DAIWAJUKI_APP_PRIVATE_KEY (現行標準),
+// DS_REPO_TOKEN / ORG_REPO_TOKEN (旧、残置検知用)。命名変更時は本体の includes() 呼び出しと
+// docs/secrets.md の両方を必ず同期更新する。
 
 function ghSecretList(target) {
     try {
