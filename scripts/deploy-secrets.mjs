@@ -55,7 +55,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEVELOP_DIR = path.resolve(__dirname, "..", "..");
-const PROJECTS_META = path.join(DEVELOP_DIR, "scripts", "projects-meta.json");
+const PROJECTS_META = path.join(DEVELOP_DIR, "_tools", "data", "projects-meta.json");
 
 const ORG = "daiwajuki";
 
@@ -176,11 +176,12 @@ function ghSecretSet({ name, value, scope, target, visibility, commit }) {
         throw new Error(`unsupported scope: ${scope}`);
     }
     if (!commit) {
-        return { ok: true, dryRun: true, cmd: `${cmd} --body <hidden>` };
+        return { ok: true, dryRun: true, cmd: `${cmd} (value via stdin)` };
     }
     try {
         // 値は stdin から渡す (CLI 引数だとプロセス一覧に出るため)
-        execSync(`${cmd} --body-file -`, { input: value, stdio: ["pipe", "pipe", "pipe"], encoding: "utf8" });
+        // gh secret set: --body を省略すると stdin から読む (gh 2.87+)
+        execSync(cmd, { input: value, stdio: ["pipe", "pipe", "pipe"], encoding: "utf8" });
         return { ok: true, dryRun: false };
     } catch (e) {
         return { ok: false, error: e.message.split("\n").slice(0, 3).join(" | ") };
