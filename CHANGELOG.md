@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/daiwajuki/ci-templates/compare/v0.10.0...v0.10.1) (2026-05-27)
+
+
+### Fixed
+
+* **secrets:** バグチェックで検出した 4 件を修正 ([#45](https://github.com/daiwajuki/ci-templates/issues/45)) ([d473f34](https://github.com/daiwajuki/ci-templates/commit/d473f3494a196070357fb5fce81b354914c479d9))
+
 ## [0.10.0](https://github.com/daiwajuki/ci-templates/compare/v0.9.3...v0.10.0) (2026-05-25)
 
 
