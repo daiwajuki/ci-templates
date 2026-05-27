@@ -118,10 +118,12 @@ function loadValue(spec) {
 }
 
 // 値の preview (長さ + 先頭4 + 末尾4 のみ。中身は絶対に出さない)
+// 末尾の \s (PEM の trailing newline 等) は slice 表示時のみ除去 (出力の見栄え目的、len は実長)
 function previewValue(val) {
     const len = val.length;
     if (len <= 8) return `(${len} chars)`;
-    return `(${len} chars: ${val.slice(0, 4)}…${val.slice(-4)})`;
+    const trimmed = val.replace(/\s+$/, "");
+    return `(${len} chars: ${trimmed.slice(0, 4)}…${trimmed.slice(-4)})`;
 }
 
 // ─── secret name validation ───────────────────────────────────────────────────
@@ -142,19 +144,16 @@ function selectProjects(meta, args) {
     const all = Object.entries(meta);
     let filtered = all;
 
-    // --projects フィルタ
-    if (args.projects === "all" || !args.projects) {
-        // 全件 (active も archived も含む。archived は次の filter で外す)
-    } else if (args.projects === "active") {
-        filtered = filtered.filter(([, m]) => m.status !== "archived");
-    } else {
+    // CSV 指定なら名前で絞り込み (ユーザー明示なので archived も含めて検索)
+    const isCsvSpec = args.projects && args.projects !== "all" && args.projects !== "active";
+    if (isCsvSpec) {
         const wanted = new Set(args.projects.split(",").map((s) => s.trim()));
         filtered = filtered.filter(([name]) => wanted.has(name));
-        // 名前指定の場合は archived も含める (ユーザーが明示したので)
     }
 
-    // archived 除外 (--include-archived がなければ)
-    if (!args.includeArchived && args.projects !== undefined && !args.projects.includes(",")) {
+    // archived 除外 (--include-archived がない、かつ CSV 指定でない場合)
+    // --projects=all / =active / 未指定 はいずれもデフォルトで archived 除外 (安全側)
+    if (!args.includeArchived && !isCsvSpec) {
         filtered = filtered.filter(([, m]) => m.status !== "archived");
     }
 

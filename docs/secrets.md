@@ -110,7 +110,7 @@ node scripts/deploy-secrets.mjs \
 node scripts/audit-secrets.mjs
 ```
 
-詳細・復元手順・ローテ手順は [_tools/secrets/README.md](../../_tools/secrets/README.md) 参照。
+詳細・復元手順・ローテ手順は [_tools/secrets/README.md](https://github.com/daiwajuki/tools/blob/main/secrets/README.md) (別リポ `daiwajuki/tools`) 参照。
 
 ## 発行手順（fine-grained PAT）
 
