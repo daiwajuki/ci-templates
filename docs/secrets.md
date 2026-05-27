@@ -3,7 +3,7 @@
 > **対象**: `daiwajuki` org の 14 業務 SaaS プロジェクト + 5 共通基盤 (`_auth` / `_design-system` / `_ci-templates` / `_pdf-forms` / `_tools`)
 > **位置付け**: governance-plan v3 Wave 0 ステップ 6 で確立した secret 体系の正本
 > **前提**: 1 人開発体制（r-taniguchi@daiwajuki.co.jp）、machine user は採らない、fine-grained PAT で運用
-> **最終棚卸し**: 2026-05-26 v2（GitHub Free プラン制約発見 + GitHub App 移行 6 件完遂を反映）
+> **最終棚卸し**: 2026-05-27 v3（active 13 件全件への App credentials fanout 完了 + ハイブリッド型保管基盤整備）
 
 ## ⚠️ GitHub Free プラン制約（最重要、2026-05-26 発見）
 
@@ -22,7 +22,7 @@
 
 GitHub Team プラン ($4/user/月) にアップグレードすれば (a) の制約は消えるが、現状は GitHub App 採用で十分対応可能なため非アップグレードを継続。
 
-## トークン一覧（実態ベース、2026-05-26 v2 現在）
+## トークン一覧（実態ベース、2026-05-27 v3 現在）
 
 ### org-level secret
 
@@ -40,30 +40,29 @@ GitHub Team プラン ($4/user/月) にアップグレードすれば (a) の制
 | `_pdf-forms` (daiwajuki/pdf-forms) | `RELEASE_PAT` | release-please の tag push downstream trigger 用 (`release-please.yml:63`)。`secrets.GITHUB_TOKEN` fallback 付き |
 | `_tools` (daiwajuki/tools) | `GH_PAT_READONLY` | `snapshot-adoption.yml:37` で `|| github.token` フォールバック付き参照。現状は fallback 経路で稼働 |
 
-### repo-level secret（consumer 14 repo、2026-05-26 v2）
+### repo-level secret（consumer 13 active repo、2026-05-27 v3）
 
-cross-repo checkout の認証方式は **GitHub App `daiwajuki-cross-repo-checkout` (app_id: 3820205) が標準**。App は All repositories scope で 14 consumer すべてからアクセス可能。
+cross-repo checkout の認証方式は **GitHub App `daiwajuki-cross-repo-checkout` (app_id: 3820205) が標準**。App は All repositories scope で 13 active consumer すべてからアクセス可能。
 
-| Repo | 認証方式 | DS_REPO_TOKEN | App credentials | その他 |
-|---|---|---|---|---|
-| **BidFlow** | ✅ App (2026-05-26 移行) | 残置（未使用、削除予定） | ✅ `DAIWAJUKI_APP_ID/PRIVATE_KEY` | — |
-| **DailyLogs** | ✅ App (同上) | 残置 | ✅ 同上 | — |
-| **ICPContacts** | ✅ App (同上) | 残置 | ✅ 同上 | GCP_* (WIF) |
-| **PayrollManager** | ✅ App (同上) | 残置 | ✅ 同上 | DB / Auth 系 |
-| **ICPEstimating** | ✅ App (同上) | 残置 | ✅ 同上 | — |
-| **HydraulicCalculation** | ✅ App (同上) | 残置 | ✅ 同上 | GCP_* (WIF) |
-| **ICPCostHub** | ✅ App (先行採用) | 残置 | ✅ 同上 | `PDF_FORMS_REPO_TOKEN` |
-| CompanyWebsite | ⚠️ repo-level PAT (DS_REPO_TOKEN に `daiwajuki-org-ci` 流用) | ✅ 動作中 | — | OAuth 系 |
-| ICPSitePhotos | ⚠️ repo-level PAT (ORG_REPO_TOKEN に `daiwajuki-org-ci` 流用) | 残置 | — | `ORG_REPO_TOKEN` (repo-level、2026-05-11 配備) |
-| portal | — (checkout 未使用) | — | — | — |
-| StridePlan | — (checkout 未使用) | — | — | — |
-| builddeck | — (checkout 未使用) | — | — | — |
-| contracthub-frontend | — (checkout 未使用) | — | — | — |
-| contracthub-backend | — (checkout 未使用) | — | — | — |
+| Repo | App credentials 配備 | DS_REPO_TOKEN | 配備経緯 |
+|---|---|---|---|
+| **BidFlow** | ✅ `DAIWAJUKI_APP_ID/PRIVATE_KEY` | ⚠️ 残置 | 2026-05-26 移行 → 2026-05-27 fanout で上書き |
+| **DailyLogs** | ✅ 同上 | ⚠️ 残置 | 同上 |
+| **ICPContacts** | ✅ 同上 | ⚠️ 残置 | 同上 |
+| **PayrollManager** | ✅ 同上 | ⚠️ 残置 | 同上 |
+| **ICPEstimating** | ✅ 同上 | ⚠️ 残置 | 同上 |
+| **HydraulicCalculation** | ✅ 同上 | ⚠️ 残置 | 同上 |
+| **ICPCostHub** | ✅ 同上 | ⚠️ 残置 | 2026-05-26 先行採用 → 2026-05-27 上書き |
+| **ICPSitePhotos** | ✅ 同上 | ⚠️ 残置 | 2026-05-27 fanout で配備（ORG_REPO_TOKEN repo-level も残置） |
+| **CompanyWebsite** | ✅ 同上 | ⚠️ 残置 | 2026-05-27 fanout で初配備 |
+| **Portal** | ✅ 同上 | — | 2026-05-27 fanout で初配備 |
+| **StridePlan** | ✅ 同上 | — | 同上 |
+| **BuildDeck** | ✅ 同上 | — | 同上 |
+| **PDFform** | ✅ 同上 | — | 同上 |
 
-**進捗**: 7/14 が App 認証稼働（2026-05-26 一日で 6 件移行完了）、2 件が repo-level PAT 残置、5 件が design-system 配給未開始。
+**進捗**: 13/13 active consumer が App credentials 配備済（2026-05-27 fanout 完遂）。`contacts` は archived のため対象外。
 
-**残置している DS_REPO_TOKEN**: 旧個人 repo `r-taniguchi-daiwajuki/_design-system` 時代の PAT。daiwajuki org private repo へのアクセス権なし。本日の App 移行で workflow からの参照は全廃。secret 本体の削除は follow-up task で対応予定。
+**残置している DS_REPO_TOKEN**: 旧個人 repo `r-taniguchi-daiwajuki/_design-system` 時代の PAT。daiwajuki org private repo へのアクセス権なし。workflow からの参照は全廃済。secret 本体の削除は follow-up task で対応予定。
 
 ### 旧 spec で定義していたが、現在は配備していない
 
@@ -77,6 +76,41 @@ cross-repo checkout の認証方式は **GitHub App `daiwajuki-cross-repo-checko
 **重要**: 上記すべて **r-taniguchi 個人名義の fine-grained PAT** で発行する。machine user は採らない（GitHub Team 課金 +$4/月と 2FA 管理の負担に見合わないため）。
 
 **Spec vs 実態の同期義務**: secret の追加・削除・命名変更を行ったら、本 doc の上記表を**必ず同時更新**する。過去事例: 本 doc は 2026-05-22 初版から 2026-05-26 まで 4 日間放置され、実態とは大きく乖離していた（governance-plan の `GH_PACKAGES_TOKEN` / `AUTH_REPO_TOKEN` が一度も配備されないまま、ICPSitePhotos の `ORG_REPO_TOKEN` 創設や ICPCostHub の GitHub App 採用が先行していた）。
+
+## App credentials の保管場所（2026-05-27 整備）
+
+`DAIWAJUKI_APP_ID` / `DAIWAJUKI_APP_PRIVATE_KEY` は GitHub App `daiwajuki-cross-repo-checkout` (app_id: `3820205`) の credentials。**ハイブリッド型で管理**:
+
+| 階層 | 場所 | 役割 |
+|---|---|---|
+| **正本（永続）** | 1Password `daiwajuki-ops` ボルト、エントリ名 `GitHub App: daiwajuki-cross-repo-checkout` | マシン紛失・新規セットアップ時の復元元。PEM は attachment、APP_ID は `app-id` フィールド |
+| **作業用（ローカル）** | `_tools/secrets/daiwajuki-cross-repo-checkout.{private-key.pem, app-id.txt}` | fanout 配備時の値供給元。`_tools/.gitignore` で `secrets/` / `*.pem` を除外済（誤コミット防止） |
+| **配備先（GitHub）** | 各 consumer repo の repo-level secret (`DAIWAJUKI_APP_ID` / `DAIWAJUKI_APP_PRIVATE_KEY`) | workflow 実行時に `actions/create-github-app-token@v1` が installation token を mint |
+
+### 配備フロー（ハイブリッド型）
+
+```bash
+cd C:/Users/daiwa/Develop/_ci-templates
+
+# 1. dry-run でプレビュー
+node scripts/deploy-secrets.mjs \
+  --target=DAIWAJUKI_APP_ID --scope=repo --projects=active \
+  --value-from=file:../_tools/secrets/daiwajuki-cross-repo-checkout.app-id.txt
+
+# 2. 本番配備（APP_ID と PEM の 2 回）
+node scripts/deploy-secrets.mjs \
+  --target=DAIWAJUKI_APP_ID --scope=repo --projects=active \
+  --value-from=file:../_tools/secrets/daiwajuki-cross-repo-checkout.app-id.txt --commit
+
+node scripts/deploy-secrets.mjs \
+  --target=DAIWAJUKI_APP_PRIVATE_KEY --scope=repo --projects=active \
+  --value-from=file:../_tools/secrets/daiwajuki-cross-repo-checkout.private-key.pem --commit
+
+# 3. 配備確認
+node scripts/audit-secrets.mjs
+```
+
+詳細・復元手順・ローテ手順は [_tools/secrets/README.md](../../_tools/secrets/README.md) 参照。
 
 ## 発行手順（fine-grained PAT）
 
@@ -257,21 +291,22 @@ gh secret delete ORG_REPO_TOKEN_OLD --org daiwajuki
 |---|---|---|---|
 | Cloud Run / Artifact Registry へのデプロイ | WIF | ✅ 実装済み | なし |
 | GitHub Packages の install (`@daiwajuki/*` private) | ローカル `.npmrc` の `${GH_PACKAGES_TOKEN}` env (classic PAT `daiwajuki-packages-read`、無期限) | ❌ GitHub 仕様で OIDC / App 認証不可 | (1) 1 年期限付き fine-grained PAT に再発行、(2) CI 側は repo-level secret か `github.token + packages: read` permission で代替 |
-| `daiwajuki/daiwajuki-UIdesign` の cross-repo clone | 14 consumer 中 **7 件 App 認証**、2 件 repo-level PAT、5 件 未配給 | ✅ 7/14 完了 (2026-05-26) | 残 9 件のうち 2 件 (CompanyWebsite / ICPSitePhotos) を App 化、5 件は配給開始時に App パターンで揃える |
+| `daiwajuki/daiwajuki-UIdesign` の cross-repo clone | 13 active consumer 全件に App credentials 配備済 (2026-05-27) | ✅ 13/13 完了 | 各 consumer の workflow を App 経由 (`actions/create-github-app-token@v1`) に書き換え。未書き換え分の残作業棚卸し |
 | `additional-build-context-repos` (`_pdf-forms` 等) の clone | ICPCostHub のみ `DAIWAJUKI_APP_*` (App) | ✅ App 化済 | 配給先が増えたら同パターン |
 | 採用側 14 リポへの Issue 投稿 | `ADOPTER_NOTIFY_TOKEN` (PAT、F-1 実装済み) | ⚠ 将来 GitHub App で代替 (F-4) | F-4 完了時に PAT 廃止 |
 
-**App 横展開 完了状況** (2026-05-26 終了時点):
+**App 横展開 完了状況** (2026-05-27 終了時点):
 
 | Phase | 内容 | 状態 |
 |---|---|---|
 | 0 | `daiwajuki-cross-repo-checkout` App 作成 + repository access = All | ✅ 完了 |
 | 1 | secret 命名統一 (`DAIWAJUKI_APP_ID` / `DAIWAJUKI_APP_PRIVATE_KEY`) | ✅ 完了 (ICPCostHub の既存名を踏襲) |
 | 2 | composite action 化 (`_ci-templates/.github/actions/checkout-cross-repo/`) | ❌ 未着手 (Phase 4 が直接実装で先行) |
-| 3 | App credentials の secret 配備 (7 consumer) | ✅ 完了 (ICPCostHub + 6 件) |
-| 4 | 各 consumer の workflow を `actions/create-github-app-token` 経由に書き換え | ✅ 7/14 完了 (残 2 件 + 5 件未配給) |
+| 3 | App credentials の secret 配備 (13 active consumer) | ✅ 完了 (2026-05-27 fanout で 13/13) |
+| 4 | 各 consumer の workflow を `actions/create-github-app-token` 経由に書き換え | ✅ 7/13 完了 (残 6 件: CompanyWebsite/ICPSitePhotos/Portal/StridePlan/BuildDeck/PDFform、credentials は配備済) |
 | 5 | PAT retire (`DS_REPO_TOKEN-design-system` + `ORG_REPO_TOKEN` org-level) | 🔄 `ORG_REPO_TOKEN` org-level は 2026-05-26 削除、`DS_REPO_TOKEN-design-system` PAT は follow-up task で削除予定 |
 | 6 | ドキュメント・監査更新 (`docs/secrets.md` + `audit-secrets.mjs`) | ✅ 本 PR で対応 |
+| 7 | ハイブリッド型保管基盤 (1Password 正本 + `_tools/secrets/` 作業用) | ✅ 完了 (2026-05-27) |
 
 詳細計画は別 follow-up task chip 「GitHub App 横展開で PAT 全廃ロードマップ」を参照。
 
@@ -289,3 +324,9 @@ gh secret delete ORG_REPO_TOKEN_OLD --org daiwajuki
   1. **GitHub Free プラン制約の発見** — org-level secret が private repo に届かない仕様を診断ステップで確定。「⚠️ GitHub Free プラン制約」セクションを新設
   2. **GitHub App 横展開で 6 consumer 移行完了** — BidFlow / DailyLogs / ICPContacts / PayrollManager / ICPEstimating / HydraulicCalculation の design-system-audit.yml を `actions/create-github-app-token@v1` 経由に書き換え、各 repo に `DAIWAJUKI_APP_ID` / `DAIWAJUKI_APP_PRIVATE_KEY` を配備。
   3. **`ORG_REPO_TOKEN` org-level secret を削除** — Free プラン制約で機能していなかったため。今後は repo-level secret か GitHub App で対応。
+- **2026-05-27 v3** App credentials 管理基盤を整備:
+  1. **active 13 件全件に `DAIWAJUKI_APP_ID` / `DAIWAJUKI_APP_PRIVATE_KEY` を fanout 配備** — 既配備 8 件は同値で no-op 上書き、未配備 5 件 (BuildDeck/CompanyWebsite/Portal/StridePlan/PDFform) を新規配備。13/13 ✅。
+  2. **ハイブリッド型保管基盤を確立** — 正本 = 1Password `daiwajuki-ops` ボルト、作業用 = `_tools/secrets/`（gitignore）、配備 = `deploy-secrets.mjs --projects=active`。手順を「App credentials の保管場所」セクションと [_tools/secrets/README.md](../../_tools/secrets/README.md) に明記。
+  3. **`audit-secrets.mjs` / `deploy-secrets.mjs` のパスバグ修正** — `scripts/projects-meta.json` → `_tools/data/projects-meta.json`。
+  4. **`deploy-secrets.mjs` の `gh secret set` 呼び出しを修正** — gh 2.87+ では `--body-file` フラグが廃止されており、`--body` 省略で stdin から読む正規仕様に統一。
+  5. **PEM の保管位置を是正** — 旧 `ICPSitePhotos/daiwajuki-cross-repo-checkout.2026-05-26.private-key.pem`（個別 repo 配下）を `_tools/secrets/daiwajuki-cross-repo-checkout.private-key.pem` に移動（gitignore 済の正本位置）。

@@ -29,7 +29,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEVELOP_DIR = path.resolve(__dirname, "..", "..");
-const PROJECTS_META = path.join(DEVELOP_DIR, "scripts", "projects-meta.json");
+const PROJECTS_META = path.join(DEVELOP_DIR, "_tools", "data", "projects-meta.json");
 
 const JSON_OUTPUT = process.argv.includes("--json");
 
