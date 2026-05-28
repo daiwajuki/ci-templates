@@ -98,7 +98,9 @@ on:
     secrets:
       COLOCATE_TOKEN:
         description: |
-          colocate-repo がプライベートの場合のアクセストークン（未指定時は github.token）。
+          colocate-repo がプライベートの場合の PAT。
+          優先順: external-checkout-app-* で mint した App token > COLOCATE_TOKEN > github.token。
+          v0.11+ から App credentials 経由が推奨。COLOCATE_TOKEN は legacy 互換のため残す。
           secret 名はハイフン不可のため UPPER_SNAKE で命名 (v0.6.0 でリネームすべきだったが
           YAML 反映漏れで v0.10.0 まで silent broken だった経緯あり)。
         required: false
@@ -170,6 +172,31 @@ jobs:
           if [ -z "$C" ]; then C="${{ inputs.source-path }}"; fi
           echo "value=$C" >> "$GITHUB_OUTPUT"
 
+      # ─── App credentials の検出 + token mint (colocate / additional 共有) ───
+      # external-checkout-app-id/private-key が渡されていれば installation token を mint し、
+      # colocate-repo のチェックアウトと後段の additional-build-context-repos clone で共有利用する。
+      # 旧 COLOCATE_TOKEN (PAT) も受理（App 優先、両方未指定なら github.token フォールバック）。
+      - name: Detect App credentials presence
+        id: has-app
+        env:
+          APP_ID: ${{ secrets.external-checkout-app-id }}
+        shell: bash
+        run: |
+          if [ -n "$APP_ID" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate GitHub App installation token
+        if: steps.has-app.outputs.available == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.external-checkout-app-id }}
+          private-key: ${{ secrets.external-checkout-app-private-key }}
+          owner: ${{ github.repository_owner }}
+
       # ─── colocate-repo を build context 配下に配置 ────────────────────────
       - name: Checkout colocate-repo
         if: inputs.colocate-repo != ''
@@ -177,7 +204,8 @@ jobs:
         with:
           repository: ${{ inputs.colocate-repo }}
           ref: ${{ inputs.colocate-ref }}
-          token: ${{ secrets.COLOCATE_TOKEN || github.token }}
+          # 優先順: App-mint token > COLOCATE_TOKEN (PAT) > GITHUB_TOKEN
+          token: ${{ steps.app-token.outputs.token || secrets.COLOCATE_TOKEN || github.token }}
           path: ${{ inputs.colocate-path }}
 
       - name: Validate WIF configuration
@@ -262,28 +290,7 @@ jobs:
       # ─── BuildKit additional build contexts (オプション) ──────────────────
       # `additional-build-context-repos` 経由で別 repo を build context として注入する。
       # colocate-repo (旧パターン) と共存可能。新規利用ではこちらを推奨。
-      - name: Detect App credentials presence
-        if: inputs.build-mode == 'image' && inputs.additional-build-context-repos != ''
-        id: has-app
-        env:
-          APP_ID: ${{ secrets.external-checkout-app-id }}
-        shell: bash
-        run: |
-          if [ -n "$APP_ID" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Generate GitHub App installation token
-        if: steps.has-app.outputs.available == 'true'
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.external-checkout-app-id }}
-          private-key: ${{ secrets.external-checkout-app-private-key }}
-          owner: ${{ github.repository_owner }}
-
+      # App installation token は上段で mint 済 (colocate-repo と共有)。
       - name: Clone additional repos for build contexts
         if: inputs.build-mode == 'image' && inputs.additional-build-context-repos != ''
         env:

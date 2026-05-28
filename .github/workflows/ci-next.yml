@@ -56,7 +56,16 @@ on:
         description: GitHub Packages 読み取り用トークン（org secret。未指定時は github.token で試行）
         required: false
       COLOCATE_TOKEN:
-        description: colocate-repo がプライベートの場合のアクセストークン（未指定時は github.token）。secret 名はハイフン不可のためアンダースコアで命名。
+        description: colocate-repo がプライベートの場合のアクセストークン（未指定時は external-checkout-app-* で mint した token、それも無ければ github.token）。secret 名はハイフン不可のためアンダースコアで命名。
+        required: false
+      external-checkout-app-id:
+        description: |
+          GitHub App ID。external-checkout-app-private-key と組で colocate-repo の
+          short-lived installation token を mint する（PAT より権限境界明確 + renewable）。
+          COLOCATE_TOKEN より優先。
+        required: false
+      external-checkout-app-private-key:
+        description: GitHub App private key (PEM 全文)。external-checkout-app-id と組で必須。
         required: false
 
 # Node.js 24 を先取り opt-in (2026-06-02 で強制移行、それ以前に互換性を検証する)。
@@ -82,13 +91,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ─── App credentials が指定されていれば installation token を mint ────────
+      # COLOCATE_TOKEN PAT 方式と並行サポート（App 優先）。両方未指定なら github.token。
+      - name: Detect App credentials presence
+        if: inputs.colocate-repo != ''
+        id: has-app
+        env:
+          APP_ID: ${{ secrets.external-checkout-app-id }}
+        shell: bash
+        run: |
+          if [ -n "$APP_ID" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate GitHub App installation token (colocate)
+        if: inputs.colocate-repo != '' && steps.has-app.outputs.available == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.external-checkout-app-id }}
+          private-key: ${{ secrets.external-checkout-app-private-key }}
+          owner: ${{ github.repository_owner }}
+
       - name: Checkout colocate-repo
         if: inputs.colocate-repo != ''
         uses: actions/checkout@v4
         with:
           repository: ${{ inputs.colocate-repo }}
           ref: ${{ inputs.colocate-ref }}
-          token: ${{ secrets.COLOCATE_TOKEN || github.token }}
+          # 優先順: App-mint token > COLOCATE_TOKEN (PAT) > GITHUB_TOKEN (同 repo / public のみ)
+          token: ${{ steps.app-token.outputs.token || secrets.COLOCATE_TOKEN || github.token }}
           path: __colocate__
 
       - name: Place colocate-repo at expected path
