@@ -3,7 +3,7 @@
 > **対象**: `daiwajuki` org の 14 業務 SaaS プロジェクト + 5 共通基盤 (`_auth` / `_design-system` / `_ci-templates` / `_pdf-forms` / `_tools`)
 > **位置付け**: governance-plan v3 Wave 0 ステップ 6 で確立した secret 体系の正本
 > **前提**: 1 人開発体制（r-taniguchi@daiwajuki.co.jp）、machine user は採らない、fine-grained PAT で運用
-> **最終棚卸し**: 2026-05-27 v3（active 13 件全件への App credentials fanout 完了 + ハイブリッド型保管基盤整備）
+> **最終棚卸し**: 2026-05-28 v5（F-4 完遂 — `ADOPTER_NOTIFY_TOKEN` PAT を `daiwajuki-adopter-notify` App credentials へ移行、ci-templates 配下から PAT 全廃完了）
 
 ## ⚠️ GitHub Free プラン制約（最重要、2026-05-26 発見）
 
@@ -80,7 +80,7 @@ cross-repo checkout の認証方式は **GitHub App `daiwajuki-cross-repo-checko
 | App | app_id | 用途 | 配備先 | repo-level secret 名 |
 |---|---|---|---|---|
 | `daiwajuki-cross-repo-checkout` | `3820205` | cross-repo checkout (contents:read) | 13 active consumer | `DAIWAJUKI_APP_ID` / `DAIWAJUKI_APP_PRIVATE_KEY` |
-| `daiwajuki-adopter-notify` | TBD (F-4 で作成) | adopter リポへの issues:write + drift 検出時の contents:read | `_ci-templates` のみ | `ADOPTER_NOTIFY_APP_ID` / `ADOPTER_NOTIFY_APP_PRIVATE_KEY` |
+| `daiwajuki-adopter-notify` | `3892779` | adopter リポへの issues:write + drift 検出時の contents:read | `_ci-templates` のみ | `ADOPTER_NOTIFY_APP_ID` / `ADOPTER_NOTIFY_APP_PRIVATE_KEY` |
 
 両 App とも r-taniguchi が org owner として直接管理。private key は GCP Secret Manager に永続保管 + ローカル作業ファイル + GitHub App 設定画面（最大 2 個併存）の三重保管。
 
@@ -324,8 +324,9 @@ gh secret delete ORG_REPO_TOKEN_OLD --org daiwajuki
 | 3 | App credentials の secret 配備 (13 active consumer) | ✅ 完了 (2026-05-27 fanout で 13/13) |
 | 4 | 各 consumer の workflow を `actions/create-github-app-token` 経由に書き換え | ✅ 13/13 完了 (2026-05-27 CompanyWebsite PR #10 merge で完遂)。実態調査 (2026-05-28) で判明: ICPSitePhotos は 2026-05-26 PR #16 merge 時点で ci.yml / design-system-audit.yml 共に既に移行済、Portal は `secrets: inherit` 付き reusable workflow 採用で間接的に App 経由、StridePlan は `.github/workflows` 自体 main に未配置、BuildDeck/PDFform は cross-repo checkout を行わない workflow 構成のため書き換え対象外 (credentials は将来の cross-repo 構成導入時のための先行配備として保持) |
 | 5 | PAT retire (`DS_REPO_TOKEN` repo-level + `ORG_REPO_TOKEN` repo-level) | ✅ 完了 (2026-05-28)。9 repo の `DS_REPO_TOKEN` + ICPSitePhotos の `ORG_REPO_TOKEN` を一括削除、BidFlow の `ORG_REPO_TOKEN` は ci-templates v0.11.0 (#47) で colocate-repo の App credentials 対応を追加 → BidFlow [#64](https://github.com/daiwajuki/BidFlow/pull/64) で deploy-web.yml の `COLOCATE_TOKEN` 参照を削除 → secret 削除の 3 段で retire。`ORG_REPO_TOKEN` org-level は 2026-05-26 削除済 |
-| 6 | ドキュメント・監査更新 (`docs/secrets.md` + `audit-secrets.mjs`) | ✅ 本 PR で対応 |
+| 6 | ドキュメント・監査更新 (`docs/secrets.md` + `audit-secrets.mjs`) | ✅ 完了 |
 | 7 | ハイブリッド型保管基盤 (GCP Secret Manager 正本 + `_tools/secrets/` 作業用) | ✅ 完了 (2026-05-28、当初 v3 で 1Password 正本を計画したが 1Password 未契約のため GCP Secret Manager に切替) |
+| 8 | F-4: `ADOPTER_NOTIFY_TOKEN` PAT を `daiwajuki-adopter-notify` App credentials へ移行 | ✅ 完了 (2026-05-28、ci-templates v0.12.0 [#52](https://github.com/daiwajuki/ci-templates/pull/52))。新規 App `daiwajuki-adopter-notify` (app_id: `3892779`) を Issues:write + Contents:read + Metadata:read で作成、All repositories scope で install。`ADOPTER_NOTIFY_APP_ID` / `ADOPTER_NOTIFY_APP_PRIVATE_KEY` を ci-templates repo-level に配備、`notify-adopters.yml` / `audit-drift.yml` を `actions/create-github-app-token@v1` 経由に書き換え。v0.12.0 リリース時の release: published 経由で 8 adopter 全件に通知 issue が App token で正常投稿されることを実測 → 旧 `ADOPTER_NOTIFY_TOKEN` repo-level secret を削除。これで **ci-templates 配下から PAT 全廃完了** |
 
 詳細計画は別 follow-up task chip 「GitHub App 横展開で PAT 全廃ロードマップ」を参照。
 
