@@ -40,29 +40,27 @@ GitHub Team プラン ($4/user/月) にアップグレードすれば (a) の制
 | `_pdf-forms` (daiwajuki/pdf-forms) | `RELEASE_PAT` | release-please の tag push downstream trigger 用 (`release-please.yml:63`)。`secrets.GITHUB_TOKEN` fallback 付き |
 | `_tools` (daiwajuki/tools) | `GH_PAT_READONLY` | `snapshot-adoption.yml:37` で `|| github.token` フォールバック付き参照。現状は fallback 経路で稼働 |
 
-### repo-level secret（consumer 13 active repo、2026-05-27 v3）
+### repo-level secret（consumer 13 active repo、2026-05-28 v4）
 
 cross-repo checkout の認証方式は **GitHub App `daiwajuki-cross-repo-checkout` (app_id: 3820205) が標準**。App は All repositories scope で 13 active consumer すべてからアクセス可能。
 
 | Repo | App credentials 配備 | DS_REPO_TOKEN | 配備経緯 |
 |---|---|---|---|
-| **BidFlow** | ✅ `DAIWAJUKI_APP_ID/PRIVATE_KEY` | ⚠️ 残置 | 2026-05-26 移行 → 2026-05-27 fanout で上書き |
-| **DailyLogs** | ✅ 同上 | ⚠️ 残置 | 同上 |
-| **ICPContacts** | ✅ 同上 | ⚠️ 残置 | 同上 |
-| **PayrollManager** | ✅ 同上 | ⚠️ 残置 | 同上 |
-| **ICPEstimating** | ✅ 同上 | ⚠️ 残置 | 同上 |
-| **HydraulicCalculation** | ✅ 同上 | ⚠️ 残置 | 同上 |
-| **ICPCostHub** | ✅ 同上 | ⚠️ 残置 | 2026-05-26 先行採用 → 2026-05-27 上書き |
-| **ICPSitePhotos** | ✅ 同上 | ⚠️ 残置 | 2026-05-27 fanout で配備（ORG_REPO_TOKEN repo-level も残置） |
-| **CompanyWebsite** | ✅ 同上 | ⚠️ 残置 | 2026-05-27 fanout で初配備 |
+| **BidFlow** | ✅ `DAIWAJUKI_APP_ID/PRIVATE_KEY` | ✅ 削除済 (2026-05-28) | ORG_REPO_TOKEN も #64 merge 後の 2026-05-28 削除 |
+| **DailyLogs** | ✅ 同上 | ✅ 削除済 (2026-05-28) | — |
+| **ICPContacts** | ✅ 同上 | ✅ 削除済 (2026-05-28) | — |
+| **PayrollManager** | ✅ 同上 | ✅ 削除済 (2026-05-28) | — |
+| **ICPEstimating** | ✅ 同上 | ✅ 削除済 (2026-05-28) | — |
+| **HydraulicCalculation** | ✅ 同上 | ✅ 削除済 (2026-05-28) | — |
+| **ICPCostHub** | ✅ 同上 | ✅ 削除済 (2026-05-28) | — |
+| **ICPSitePhotos** | ✅ 同上 | ✅ 削除済 (2026-05-28) | ORG_REPO_TOKEN repo-level も 2026-05-28 削除 |
+| **CompanyWebsite** | ✅ 同上 | ✅ 削除済 (2026-05-28) | — |
 | **Portal** | ✅ 同上 | — | 2026-05-27 fanout で初配備 |
 | **StridePlan** | ✅ 同上 | — | 同上 |
 | **BuildDeck** | ✅ 同上 | — | 同上 |
 | **PDFform** | ✅ 同上 | — | 同上 |
 
-**進捗**: 13/13 active consumer が App credentials 配備済（2026-05-27 fanout 完遂）。`contacts` は archived のため対象外。
-
-**残置している DS_REPO_TOKEN**: 旧個人 repo `r-taniguchi-daiwajuki/_design-system` 時代の PAT。daiwajuki org private repo へのアクセス権なし。workflow からの参照は全廃済。secret 本体の削除は follow-up task で対応予定。
+**進捗**: 13/13 active consumer が App credentials 配備済 + 全 PAT 削除完了（2026-05-28 Phase 5 完遂）。`contacts` は archived のため対象外。
 
 ### 旧 spec で定義していたが、現在は配備していない
 
@@ -316,7 +314,7 @@ gh secret delete ORG_REPO_TOKEN_OLD --org daiwajuki
 | 2 | composite action 化 (`_ci-templates/.github/actions/checkout-cross-repo/`) | ❌ 未着手 (Phase 4 が直接実装で先行) |
 | 3 | App credentials の secret 配備 (13 active consumer) | ✅ 完了 (2026-05-27 fanout で 13/13) |
 | 4 | 各 consumer の workflow を `actions/create-github-app-token` 経由に書き換え | ✅ 13/13 完了 (2026-05-27 CompanyWebsite PR #10 merge で完遂)。実態調査 (2026-05-28) で判明: ICPSitePhotos は 2026-05-26 PR #16 merge 時点で ci.yml / design-system-audit.yml 共に既に移行済、Portal は `secrets: inherit` 付き reusable workflow 採用で間接的に App 経由、StridePlan は `.github/workflows` 自体 main に未配置、BuildDeck/PDFform は cross-repo checkout を行わない workflow 構成のため書き換え対象外 (credentials は将来の cross-repo 構成導入時のための先行配備として保持) |
-| 5 | PAT retire (`DS_REPO_TOKEN` repo-level + `ORG_REPO_TOKEN` repo-level) | 🔄 `ORG_REPO_TOKEN` org-level は 2026-05-26 削除済。残置中の repo-level `DS_REPO_TOKEN` (9 repo) と `ORG_REPO_TOKEN` (ICPSitePhotos) は 2026-05-28 削除 (本 PR で対応) |
+| 5 | PAT retire (`DS_REPO_TOKEN` repo-level + `ORG_REPO_TOKEN` repo-level) | ✅ 完了 (2026-05-28)。9 repo の `DS_REPO_TOKEN` + ICPSitePhotos の `ORG_REPO_TOKEN` を一括削除、BidFlow の `ORG_REPO_TOKEN` は ci-templates v0.11.0 (#47) で colocate-repo の App credentials 対応を追加 → BidFlow [#64](https://github.com/daiwajuki/BidFlow/pull/64) で deploy-web.yml の `COLOCATE_TOKEN` 参照を削除 → secret 削除の 3 段で retire。`ORG_REPO_TOKEN` org-level は 2026-05-26 削除済 |
 | 6 | ドキュメント・監査更新 (`docs/secrets.md` + `audit-secrets.mjs`) | ✅ 本 PR で対応 |
 | 7 | ハイブリッド型保管基盤 (GCP Secret Manager 正本 + `_tools/secrets/` 作業用) | ✅ 完了 (2026-05-28、当初 v3 で 1Password 正本を計画したが 1Password 未契約のため GCP Secret Manager に切替) |
 
