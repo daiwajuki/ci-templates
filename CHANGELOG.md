@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/daiwajuki/ci-templates/compare/v0.10.1...v0.11.0) (2026-05-28)
+
+
+### Added
+
+* **next:** support App credentials for colocate-repo checkout ([#47](https://github.com/daiwajuki/ci-templates/issues/47)) ([c1cf360](https://github.com/daiwajuki/ci-templates/commit/c1cf360bcdcbdc443ab5a880f34e81b1031f62c9))
+
 ## [0.10.1](https://github.com/daiwajuki/ci-templates/compare/v0.10.0...v0.10.1) (2026-05-27)
 
 
