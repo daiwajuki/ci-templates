@@ -176,26 +176,13 @@ jobs:
       # external-checkout-app-id/private-key が渡されていれば installation token を mint し、
       # colocate-repo のチェックアウトと後段の additional-build-context-repos clone で共有利用する。
       # 旧 COLOCATE_TOKEN (PAT) も受理（App 優先、両方未指定なら github.token フォールバック）。
-      - name: Detect App credentials presence
-        id: has-app
-        env:
-          APP_ID: ${{ secrets.external-checkout-app-id }}
-        shell: bash
-        run: |
-          if [ -n "$APP_ID" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Generate GitHub App installation token
-        if: steps.has-app.outputs.available == 'true'
+      # Detect/Mint の重複ロジックは mint-app-token composite に集約 (Phase 2)。
+      - name: Mint App installation token
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: daiwajuki/ci-templates/.github/actions/mint-app-token@v0
         with:
           app-id: ${{ secrets.external-checkout-app-id }}
-          private-key: ${{ secrets.external-checkout-app-private-key }}
-          owner: ${{ github.repository_owner }}
+          app-private-key: ${{ secrets.external-checkout-app-private-key }}
 
       # ─── colocate-repo を build context 配下に配置 ────────────────────────
       - name: Checkout colocate-repo
