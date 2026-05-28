@@ -36,7 +36,7 @@ GitHub Team プラン ($4/user/月) にアップグレードすれば (a) の制
 |---|---|---|
 | `_auth` (daiwajuki/daiwajuki-auth) | （なし） | release-please / publish は `GITHUB_TOKEN` のみで完結 |
 | `_design-system` (daiwajuki/daiwajuki-UIdesign) | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | Storybook を Cloudflare Pages に deploy (`storybook-deploy.yml`) |
-| `_ci-templates` (daiwajuki/ci-templates) | `ADOPTER_NOTIFY_TOKEN` | 採用側 14 リポへの Issue 投稿 (`notify-adopters.yml` / `audit-drift.yml`) |
+| `_ci-templates` (daiwajuki/ci-templates) | `ADOPTER_NOTIFY_APP_ID` / `ADOPTER_NOTIFY_APP_PRIVATE_KEY` | adopter リポへの Issue 投稿 + drift 検出 (`notify-adopters.yml` / `audit-drift.yml`)。daiwajuki-adopter-notify App credentials。F-4 (2026-05-28) で旧 `ADOPTER_NOTIFY_TOKEN` PAT から移行 |
 | `_pdf-forms` (daiwajuki/pdf-forms) | `RELEASE_PAT` | release-please の tag push downstream trigger 用 (`release-please.yml:63`)。`secrets.GITHUB_TOKEN` fallback 付き |
 | `_tools` (daiwajuki/tools) | `GH_PAT_READONLY` | `snapshot-adoption.yml:37` で `|| github.token` フォールバック付き参照。現状は fallback 経路で稼働 |
 
@@ -74,6 +74,15 @@ cross-repo checkout の認証方式は **GitHub App `daiwajuki-cross-repo-checko
 **重要**: 上記すべて **r-taniguchi 個人名義の fine-grained PAT** で発行する。machine user は採らない（GitHub Team 課金 +$4/月と 2FA 管理の負担に見合わないため）。
 
 **Spec vs 実態の同期義務**: secret の追加・削除・命名変更を行ったら、本 doc の上記表を**必ず同時更新**する。過去事例: 本 doc は 2026-05-22 初版から 2026-05-26 まで 4 日間放置され、実態とは大きく乖離していた（governance-plan の `GH_PACKAGES_TOKEN` / `AUTH_REPO_TOKEN` が一度も配備されないまま、ICPSitePhotos の `ORG_REPO_TOKEN` 創設や ICPCostHub の GitHub App 採用が先行していた）。
+
+## GitHub App 一覧（2026-05-28 F-4 完遂）
+
+| App | app_id | 用途 | 配備先 | repo-level secret 名 |
+|---|---|---|---|---|
+| `daiwajuki-cross-repo-checkout` | `3820205` | cross-repo checkout (contents:read) | 13 active consumer | `DAIWAJUKI_APP_ID` / `DAIWAJUKI_APP_PRIVATE_KEY` |
+| `daiwajuki-adopter-notify` | TBD (F-4 で作成) | adopter リポへの issues:write + drift 検出時の contents:read | `_ci-templates` のみ | `ADOPTER_NOTIFY_APP_ID` / `ADOPTER_NOTIFY_APP_PRIVATE_KEY` |
+
+両 App とも r-taniguchi が org owner として直接管理。private key は GCP Secret Manager に永続保管 + ローカル作業ファイル + GitHub App 設定画面（最大 2 個併存）の三重保管。
 
 ## App credentials の保管場所（2026-05-28 GCP Secret Manager 正本化）
 
@@ -132,7 +141,7 @@ GitHub Settings → Developer settings → Personal access tokens → Fine-grain
 4. **Repository access**:
    - `ORG_REPO_TOKEN`: All repositories（packages install + cross-repo clone 兼用のため）
    - `EXTERNAL_CHECKOUT_TOKEN` (旧 spec 名、現状 `PDF_FORMS_REPO_TOKEN` 等個別命名): Only select repositories → 対象 repo
-   - `ADOPTER_NOTIFY_TOKEN`: All repositories（or 14 consumer リポ個別）
+   - `ADOPTER_NOTIFY_TOKEN`: 廃止 (F-4 で `daiwajuki-adopter-notify` App credentials に移行)
 5. **Permissions**: Repository permissions の必要最小スコープ（上の表を参照）
 6. **Generate** → トークン文字列を **すぐに** GCP Secret Manager (project `integratedconstructionplatform`) に保存（画面遷移すると二度と見られない）。`echo -n "<token>" | gcloud secrets create <name> --replication-policy=automatic --data-file=- --project=integratedconstructionplatform`
 
@@ -303,7 +312,7 @@ gh secret delete ORG_REPO_TOKEN_OLD --org daiwajuki
 | GitHub Packages の install (`@daiwajuki/*` private) | ローカル `.npmrc` の `${GH_PACKAGES_TOKEN}` env (classic PAT `daiwajuki-packages-read`、無期限) | ❌ GitHub 仕様で OIDC / App 認証不可 | (1) 1 年期限付き fine-grained PAT に再発行、(2) CI 側は repo-level secret か `github.token + packages: read` permission で代替 |
 | `daiwajuki/daiwajuki-UIdesign` の cross-repo clone | 13 active consumer 全件に App credentials 配備済 (2026-05-27) | ✅ 13/13 完了 | 各 consumer の workflow を App 経由 (`actions/create-github-app-token@v1`) に書き換え。未書き換え分の残作業棚卸し |
 | `additional-build-context-repos` (`_pdf-forms` 等) の clone | ICPCostHub のみ `DAIWAJUKI_APP_*` (App) | ✅ App 化済 | 配給先が増えたら同パターン |
-| 採用側 14 リポへの Issue 投稿 | `ADOPTER_NOTIFY_TOKEN` (PAT、F-1 実装済み) | ⚠ 将来 GitHub App で代替 (F-4) | F-4 完了時に PAT 廃止 |
+| adopter リポへの Issue 投稿 + drift 検出 | `ADOPTER_NOTIFY_APP_ID` / `ADOPTER_NOTIFY_APP_PRIVATE_KEY` (daiwajuki-adopter-notify App) | ✅ App 化完了 (F-4、2026-05-28) | 旧 `ADOPTER_NOTIFY_TOKEN` PAT は F-4 マージ後に retire |
 
 **App 横展開 完了状況** (2026-05-28 終了時点):
 
