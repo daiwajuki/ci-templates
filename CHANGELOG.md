@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/daiwajuki/ci-templates/compare/v0.11.0...v0.12.0) (2026-05-28)
+
+
+### Added
+
+* **workflows:** ADOPTER_NOTIFY_TOKEN を GitHub App credentials へ移行 (F-4) ([#52](https://github.com/daiwajuki/ci-templates/issues/52)) ([2421b56](https://github.com/daiwajuki/ci-templates/commit/2421b56c0c2a010b3c90d1c4fd2e0f5923267b41))
+
 ## [0.11.0](https://github.com/daiwajuki/ci-templates/compare/v0.10.1...v0.11.0) (2026-05-28)
 
 
