@@ -1,0 +1,66 @@
+name: Mint App installation token
+description: |
+  GitHub App credentials (app-id + private-key) が両方とも渡されていれば
+  actions/create-github-app-token@v1 で installation token を mint し、`token`
+  output として返す。片方でも空なら mint を skip し、token は空文字を返す。
+
+  これにより「App credentials が configured されていれば短命 installation
+  token、なければ caller が `pat-fallback || github.token` へフォールバック」
+  という priority logic を呼び出し側で一行で書けるようになる。
+
+  この composite は ci-next.yml / deploy-cloudrun-{next,laravel,fastapi}.yml /
+  notify-adopters.yml / audit-drift.yml で共通利用される。各 workflow に
+  Detect/Mint の 9 行ペアを物理コピーしていた重複を集約する (Phase 2)。
+
+inputs:
+  app-id:
+    description: |
+      GitHub App ID (数字)。app-private-key と組で必須。
+      両方とも空なら mint を skip し token output は空文字。
+    required: false
+    default: ''
+  app-private-key:
+    description: GitHub App private key (PEM 全文)。app-id と組で必須。
+    required: false
+    default: ''
+  owner:
+    description: |
+      App installation を mint する org / user (空なら ${ github.repository_owner } を使う)。
+    required: false
+    default: ''
+
+outputs:
+  token:
+    description: |
+      mint された App installation token (60 分有効)。両 credentials 未指定時は空文字。
+      caller は `steps.<id>.outputs.token || secrets.PAT || github.token` の優先順で
+      checkout / gh api の token として渡せる。
+    value: ${{ steps.app-token.outputs.token }}
+  available:
+    description: app-id / private-key が両方揃って mint が走った場合のみ "true"、それ以外 "false"
+    value: ${{ steps.detect.outputs.available }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect App credentials presence
+      id: detect
+      shell: bash
+      env:
+        APP_ID: ${{ inputs.app-id }}
+        APP_KEY: ${{ inputs.app-private-key }}
+      run: |
+        if [ -n "$APP_ID" ] && [ -n "$APP_KEY" ]; then
+          echo "available=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "available=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Generate GitHub App installation token
+      if: steps.detect.outputs.available == 'true'
+      id: app-token
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ inputs.app-id }}
+        private-key: ${{ inputs.app-private-key }}
+        owner: ${{ inputs.owner || github.repository_owner }}
