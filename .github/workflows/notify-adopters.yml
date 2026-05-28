@@ -5,7 +5,9 @@ name: Notify adopters of new release
 # 新リリースが降ったことを Issue 投稿で通知する。
 #
 # 設計: docs/audit-ci-drift-design.md (案 A: Push 通知)
-# 必要 secret: ADOPTER_NOTIFY_TOKEN (issues: write × adopter repos)
+# 必要 secret: ADOPTER_NOTIFY_APP_ID + ADOPTER_NOTIFY_APP_PRIVATE_KEY
+#   (daiwajuki-adopter-notify App: issues:write × adopter repos)
+#   旧 ADOPTER_NOTIFY_TOKEN (PAT) は F-4 (2026-05-28) で App credentials へ移行
 #
 # 通常運用:
 #   release: published で自動発火 (draft / prerelease は除外)
@@ -45,6 +47,21 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # ─── App installation token を mint (adopter repos への issues:write 用) ───
+      # 旧 ADOPTER_NOTIFY_TOKEN (PAT) を daiwajuki-adopter-notify App credentials
+      # へ置き換え (F-4)。dry_run=true (workflow_dispatch のデフォルト) では実投稿
+      # しないため mint も skip し、secret 未配備状態でも手動テストできるよう保つ。
+      # release: published 経由では inputs.dry_run は未定義 (= falsy) のため mint
+      # が必ず走り、secret 未配備なら ここで即 fail する (fail-loud は意図通り)。
+      - name: Mint App installation token (adopter-notify)
+        id: mint
+        if: ${{ !inputs.dry_run }}
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.ADOPTER_NOTIFY_APP_ID }}
+          private-key: ${{ secrets.ADOPTER_NOTIFY_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
 
       - name: Resolve release metadata
         id: rel
@@ -114,13 +131,13 @@ jobs:
       - name: Ensure labels exist in each adopter (idempotent)
         if: ${{ !inputs.dry_run }}
         env:
-          GH_TOKEN: ${{ secrets.ADOPTER_NOTIFY_TOKEN }}
+          GH_TOKEN: ${{ steps.mint.outputs.token }}
         shell: bash
         run: |
           set -euo pipefail
           if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::warning::ADOPTER_NOTIFY_TOKEN not configured — skipping label creation"
-            exit 0
+            echo "::error::App installation token was not minted — check ADOPTER_NOTIFY_APP_ID / ADOPTER_NOTIFY_APP_PRIVATE_KEY secrets"
+            exit 1
           fi
           jq -r '.adopters[].repo' .github/adopters.json | while read -r repo; do
             for label_spec in \
@@ -141,7 +158,7 @@ jobs:
 
       - name: Open notification issue in each adopter
         env:
-          GH_TOKEN: ${{ secrets.ADOPTER_NOTIFY_TOKEN }}
+          GH_TOKEN: ${{ steps.mint.outputs.token }}
           RELEASE_TAG: ${{ steps.rel.outputs.tag }}
           RELEASE_URL: ${{ steps.rel.outputs.url }}
           RELEASE_BODY: ${{ steps.rel.outputs.body }}
@@ -154,7 +171,7 @@ jobs:
           if [ "${DRY_RUN:-false}" = "true" ]; then
             echo "::notice::DRY RUN mode — no issues will be created"
           elif [ -z "${GH_TOKEN:-}" ]; then
-            echo "::error::ADOPTER_NOTIFY_TOKEN is not configured (and not in dry-run). Aborting."
+            echo "::error::App installation token was not minted — check ADOPTER_NOTIFY_APP_ID / ADOPTER_NOTIFY_APP_PRIVATE_KEY secrets"
             exit 1
           fi
 
