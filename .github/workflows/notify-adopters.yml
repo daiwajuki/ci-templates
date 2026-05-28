@@ -57,11 +57,10 @@ jobs:
       - name: Mint App installation token (adopter-notify)
         id: mint
         if: ${{ !inputs.dry_run }}
-        uses: actions/create-github-app-token@v1
+        uses: daiwajuki/ci-templates/.github/actions/mint-app-token@v0
         with:
           app-id: ${{ secrets.ADOPTER_NOTIFY_APP_ID }}
-          private-key: ${{ secrets.ADOPTER_NOTIFY_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
+          app-private-key: ${{ secrets.ADOPTER_NOTIFY_APP_PRIVATE_KEY }}
 
       - name: Resolve release metadata
         id: rel

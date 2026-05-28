@@ -190,30 +190,15 @@ jobs:
       # 例: ICPCostHub api コンテナに `daiwajuki/pdf-forms` の forms-py パッケージを
       # 同梱して embedded PDF 生成 (ADR 0020 — _pdf-forms 配給パターン)。
 
-      # GitHub App credentials の有無を env 経由で判定 (actionlint: secrets.X は if: で
-      # 直接参照不可なので、env に export してから出力 step で boolean 化)
-      - name: Detect App credentials presence
+      # App credentials が渡されていれば install token を mint (短命 1h, renewable)。
+      # Detect/Mint の重複ロジックは mint-app-token composite に集約 (Phase 2)。
+      - name: Mint App installation token
         if: inputs.build-mode == 'image' && inputs.additional-build-context-repos != ''
-        id: has-app
-        env:
-          APP_ID: ${{ secrets.external-checkout-app-id }}
-        shell: bash
-        run: |
-          if [ -n "$APP_ID" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # App credentials が渡されていれば install token を mint。短命 (1h) で renewable。
-      - name: Generate GitHub App installation token
-        if: steps.has-app.outputs.available == 'true'
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: daiwajuki/ci-templates/.github/actions/mint-app-token@v0
         with:
           app-id: ${{ secrets.external-checkout-app-id }}
-          private-key: ${{ secrets.external-checkout-app-private-key }}
-          owner: ${{ github.repository_owner }}
+          app-private-key: ${{ secrets.external-checkout-app-private-key }}
 
       - name: Clone additional repos for build contexts
         if: inputs.build-mode == 'image' && inputs.additional-build-context-repos != ''

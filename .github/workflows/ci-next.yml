@@ -93,27 +93,14 @@ jobs:
 
       # ─── App credentials が指定されていれば installation token を mint ────────
       # COLOCATE_TOKEN PAT 方式と並行サポート（App 優先）。両方未指定なら github.token。
-      - name: Detect App credentials presence
+      # Detect/Mint の重複ロジックは mint-app-token composite に集約 (Phase 2)。
+      - name: Mint App installation token (colocate)
         if: inputs.colocate-repo != ''
-        id: has-app
-        env:
-          APP_ID: ${{ secrets.external-checkout-app-id }}
-        shell: bash
-        run: |
-          if [ -n "$APP_ID" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Generate GitHub App installation token (colocate)
-        if: inputs.colocate-repo != '' && steps.has-app.outputs.available == 'true'
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: daiwajuki/ci-templates/.github/actions/mint-app-token@v0
         with:
           app-id: ${{ secrets.external-checkout-app-id }}
-          private-key: ${{ secrets.external-checkout-app-private-key }}
-          owner: ${{ github.repository_owner }}
+          app-private-key: ${{ secrets.external-checkout-app-private-key }}
 
       - name: Checkout colocate-repo
         if: inputs.colocate-repo != ''

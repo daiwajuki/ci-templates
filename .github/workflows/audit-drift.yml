@@ -55,11 +55,10 @@ jobs:
       # fail するため、後続 step は確実に App 経由 token を使う (fail-loud)。
       - name: Mint App installation token (adopter-notify)
         id: mint
-        uses: actions/create-github-app-token@v1
+        uses: daiwajuki/ci-templates/.github/actions/mint-app-token@v0
         with:
           app-id: ${{ secrets.ADOPTER_NOTIFY_APP_ID }}
-          private-key: ${{ secrets.ADOPTER_NOTIFY_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
+          app-private-key: ${{ secrets.ADOPTER_NOTIFY_APP_PRIVATE_KEY }}
 
       - name: Run audit (remote)
         id: audit-remote
