@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/daiwajuki/ci-templates/compare/v0.12.0...v0.13.0) (2026-05-28)
+
+
+### Added
+
+* **actions:** add mint-app-token composite action (Phase 2 step 1/2) ([#55](https://github.com/daiwajuki/ci-templates/issues/55)) ([f7867f0](https://github.com/daiwajuki/ci-templates/commit/f7867f0e74e1c50149611c39b433274c83446431))
+
 ## [0.12.0](https://github.com/daiwajuki/ci-templates/compare/v0.11.0...v0.12.0) (2026-05-28)
 
 
