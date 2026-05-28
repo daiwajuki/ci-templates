@@ -77,20 +77,31 @@ cross-repo checkout の認証方式は **GitHub App `daiwajuki-cross-repo-checko
 
 **Spec vs 実態の同期義務**: secret の追加・削除・命名変更を行ったら、本 doc の上記表を**必ず同時更新**する。過去事例: 本 doc は 2026-05-22 初版から 2026-05-26 まで 4 日間放置され、実態とは大きく乖離していた（governance-plan の `GH_PACKAGES_TOKEN` / `AUTH_REPO_TOKEN` が一度も配備されないまま、ICPSitePhotos の `ORG_REPO_TOKEN` 創設や ICPCostHub の GitHub App 採用が先行していた）。
 
-## App credentials の保管場所（2026-05-27 整備）
+## App credentials の保管場所（2026-05-28 GCP Secret Manager 正本化）
 
 `DAIWAJUKI_APP_ID` / `DAIWAJUKI_APP_PRIVATE_KEY` は GitHub App `daiwajuki-cross-repo-checkout` (app_id: `3820205`) の credentials。**ハイブリッド型で管理**:
 
 | 階層 | 場所 | 役割 |
 |---|---|---|
-| **正本（永続）** | 1Password `daiwajuki-ops` ボルト、エントリ名 `GitHub App: daiwajuki-cross-repo-checkout` | マシン紛失・新規セットアップ時の復元元。PEM は attachment、APP_ID は `app-id` フィールド |
+| **正本（永続）** | GCP Secret Manager、プロジェクト `integratedconstructionplatform`、secret 名 `daiwajuki-cross-repo-checkout-app-id` / `daiwajuki-cross-repo-checkout-app-private-key` | マシン紛失・新規セットアップ時の復元元。`gcloud secrets versions access latest --secret=...` で取得。IAM は r-taniguchi に Owner ロール（org 直下） |
 | **作業用（ローカル）** | `_tools/secrets/daiwajuki-cross-repo-checkout.{private-key.pem, app-id.txt}` | fanout 配備時の値供給元。`_tools/.gitignore` で `secrets/` / `*.pem` を除外済（誤コミット防止） |
 | **配備先（GitHub）** | 各 consumer repo の repo-level secret (`DAIWAJUKI_APP_ID` / `DAIWAJUKI_APP_PRIVATE_KEY`) | workflow 実行時に `actions/create-github-app-token@v1` が installation token を mint |
+| **フォールバック** | GitHub App 設定画面の Private keys（最大 2 個まで併存可） | Secret Manager が利用不能・PEM 紛失時は GitHub から再発行可能 |
 
 ### 配備フロー（ハイブリッド型）
 
 ```bash
 cd C:/Users/daiwa/Develop/_ci-templates
+
+# 0. Secret Manager → ローカル作業ファイルへ書き出し（新マシンや値変更後のみ必要）
+gcloud secrets versions access latest \
+  --secret=daiwajuki-cross-repo-checkout-app-private-key \
+  --project=integratedconstructionplatform \
+  > ../_tools/secrets/daiwajuki-cross-repo-checkout.private-key.pem
+gcloud secrets versions access latest \
+  --secret=daiwajuki-cross-repo-checkout-app-id \
+  --project=integratedconstructionplatform \
+  | tr -d '\n' > ../_tools/secrets/daiwajuki-cross-repo-checkout.app-id.txt
 
 # 1. dry-run でプレビュー
 node scripts/deploy-secrets.mjs \
@@ -125,7 +136,7 @@ GitHub Settings → Developer settings → Personal access tokens → Fine-grain
    - `EXTERNAL_CHECKOUT_TOKEN` (旧 spec 名、現状 `PDF_FORMS_REPO_TOKEN` 等個別命名): Only select repositories → 対象 repo
    - `ADOPTER_NOTIFY_TOKEN`: All repositories（or 14 consumer リポ個別）
 5. **Permissions**: Repository permissions の必要最小スコープ（上の表を参照）
-6. **Generate** → トークン文字列を **すぐに** 1Password に保存（画面遷移すると二度と見られない）
+6. **Generate** → トークン文字列を **すぐに** GCP Secret Manager (project `integratedconstructionplatform`) に保存（画面遷移すると二度と見られない）。`echo -n "<token>" | gcloud secrets create <name> --replication-policy=automatic --data-file=- --project=integratedconstructionplatform`
 
 **新規 GitHub App による cross-repo checkout（推奨パターン、ICPCostHub 採用済）**:
 
@@ -271,13 +282,14 @@ gh secret set ORG_REPO_TOKEN_OLD --org daiwajuki --visibility all --body "<old-t
 # 5. _OLD secret を削除
 gh secret delete ORG_REPO_TOKEN_OLD --org daiwajuki
 
-# 6. 1Password の旧エントリを Archive（履歴として残すが現役ではない）
+# 6. GCP Secret Manager の旧バージョンを disable（履歴として残すが現役ではない）
+#    gcloud secrets versions disable <N> --secret=<name> --project=integratedconstructionplatform
 ```
 
 ## 退職者処理（業務引継ぎ）
 
 1. **org owner 移管**: 新管理者を `daiwajuki` org owner に昇格（GitHub org Settings → People）
-2. **1Password ボルト移管**: `daiwajuki-ops` ボルトの共有を新管理者に移管
+2. **GCP プロジェクト権限移管**: `integratedconstructionplatform` プロジェクトの Owner / Secret Manager Admin を新管理者に付与。旧管理者の IAM ロールは Workspace 停止と並行して削除
 3. **PAT 失効**: 旧管理者の PAT を順次 revoke（上の緊急失効手順を参照）
 4. **PAT 再発行**: 新管理者が同名 PAT を再発行
 5. **secret 更新**: org secret / repo secret を新管理者発行のトークンに更新
@@ -295,7 +307,7 @@ gh secret delete ORG_REPO_TOKEN_OLD --org daiwajuki
 | `additional-build-context-repos` (`_pdf-forms` 等) の clone | ICPCostHub のみ `DAIWAJUKI_APP_*` (App) | ✅ App 化済 | 配給先が増えたら同パターン |
 | 採用側 14 リポへの Issue 投稿 | `ADOPTER_NOTIFY_TOKEN` (PAT、F-1 実装済み) | ⚠ 将来 GitHub App で代替 (F-4) | F-4 完了時に PAT 廃止 |
 
-**App 横展開 完了状況** (2026-05-27 終了時点):
+**App 横展開 完了状況** (2026-05-28 終了時点):
 
 | Phase | 内容 | 状態 |
 |---|---|---|
@@ -303,10 +315,10 @@ gh secret delete ORG_REPO_TOKEN_OLD --org daiwajuki
 | 1 | secret 命名統一 (`DAIWAJUKI_APP_ID` / `DAIWAJUKI_APP_PRIVATE_KEY`) | ✅ 完了 (ICPCostHub の既存名を踏襲) |
 | 2 | composite action 化 (`_ci-templates/.github/actions/checkout-cross-repo/`) | ❌ 未着手 (Phase 4 が直接実装で先行) |
 | 3 | App credentials の secret 配備 (13 active consumer) | ✅ 完了 (2026-05-27 fanout で 13/13) |
-| 4 | 各 consumer の workflow を `actions/create-github-app-token` 経由に書き換え | ✅ 7/13 完了 (残 6 件: CompanyWebsite/ICPSitePhotos/Portal/StridePlan/BuildDeck/PDFform、credentials は配備済) |
-| 5 | PAT retire (`DS_REPO_TOKEN-design-system` + `ORG_REPO_TOKEN` org-level) | 🔄 `ORG_REPO_TOKEN` org-level は 2026-05-26 削除、`DS_REPO_TOKEN-design-system` PAT は follow-up task で削除予定 |
+| 4 | 各 consumer の workflow を `actions/create-github-app-token` 経由に書き換え | ✅ 13/13 完了 (2026-05-27 CompanyWebsite PR #10 merge で完遂)。実態調査 (2026-05-28) で判明: ICPSitePhotos は 2026-05-26 PR #16 merge 時点で ci.yml / design-system-audit.yml 共に既に移行済、Portal は `secrets: inherit` 付き reusable workflow 採用で間接的に App 経由、StridePlan は `.github/workflows` 自体 main に未配置、BuildDeck/PDFform は cross-repo checkout を行わない workflow 構成のため書き換え対象外 (credentials は将来の cross-repo 構成導入時のための先行配備として保持) |
+| 5 | PAT retire (`DS_REPO_TOKEN` repo-level + `ORG_REPO_TOKEN` repo-level) | 🔄 `ORG_REPO_TOKEN` org-level は 2026-05-26 削除済。残置中の repo-level `DS_REPO_TOKEN` (9 repo) と `ORG_REPO_TOKEN` (ICPSitePhotos) は 2026-05-28 削除 (本 PR で対応) |
 | 6 | ドキュメント・監査更新 (`docs/secrets.md` + `audit-secrets.mjs`) | ✅ 本 PR で対応 |
-| 7 | ハイブリッド型保管基盤 (1Password 正本 + `_tools/secrets/` 作業用) | ✅ 完了 (2026-05-27) |
+| 7 | ハイブリッド型保管基盤 (GCP Secret Manager 正本 + `_tools/secrets/` 作業用) | ✅ 完了 (2026-05-28、当初 v3 で 1Password 正本を計画したが 1Password 未契約のため GCP Secret Manager に切替) |
 
 詳細計画は別 follow-up task chip 「GitHub App 横展開で PAT 全廃ロードマップ」を参照。
 
@@ -330,3 +342,8 @@ gh secret delete ORG_REPO_TOKEN_OLD --org daiwajuki
   3. **`audit-secrets.mjs` / `deploy-secrets.mjs` のパスバグ修正** — `scripts/projects-meta.json` → `_tools/data/projects-meta.json`。
   4. **`deploy-secrets.mjs` の `gh secret set` 呼び出しを修正** — gh 2.87+ では `--body-file` フラグが廃止されており、`--body` 省略で stdin から読む正規仕様に統一。
   5. **PEM の保管位置を是正** — 旧 `ICPSitePhotos/daiwajuki-cross-repo-checkout.2026-05-26.private-key.pem`（個別 repo 配下）を `_tools/secrets/daiwajuki-cross-repo-checkout.private-key.pem` に移動（gitignore 済の正本位置）。
+- **2026-05-28 v4** 正本保管先を GCP Secret Manager に変更:
+  1. **1Password 採用を断念** — v3 計画では 1Password `daiwajuki-ops` ボルトを正本に想定していたが、運用者 (r-taniguchi) が 1Password 個人/組織アカウント未保有であることが判明し実装不可能と判明。
+  2. **GCP Secret Manager を正本に採用** — 既に `GH_PAT_READONLY` 等で同種ユースケースに使用中の `integratedconstructionplatform` プロジェクトに secret `daiwajuki-cross-repo-checkout-app-id` (payload: `3820205`) と `daiwajuki-cross-repo-checkout-app-private-key` (payload: PEM) を作成。IAM は r-taniguchi の既存 Owner ロールで自動的に access 可。
+  3. **フォールバック経路の追加** — Secret Manager 障害時は GitHub App 設定画面から PEM を再発行することで `_tools/secrets/` を再構築可能 (GitHub App は最大 2 個の PEM を併存させられる)。
+  4. **doc 更新** — 本 doc の保管場所表、ローテ手順、退職者処理の項目を 1Password 言及から GCP Secret Manager 参照に書き換え。`_tools/secrets/README.md` の復元手順も `gcloud secrets versions access` コマンドベースに更新。
