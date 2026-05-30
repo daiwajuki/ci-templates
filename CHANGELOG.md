@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.1](https://github.com/daiwajuki/ci-templates/compare/v0.14.0...v0.14.1) (2026-05-30)
+
+
+### Fixed
+
+* **audit-ci-drift:** resolve repo name from git origin instead of directory name ([#60](https://github.com/daiwajuki/ci-templates/issues/60)) ([2479d47](https://github.com/daiwajuki/ci-templates/commit/2479d470f1ad8fd880d1142a2ae409d4a9abc6cf))
+
 ## [0.14.0](https://github.com/daiwajuki/ci-templates/compare/v0.13.0...v0.14.0) (2026-05-30)
 
 
