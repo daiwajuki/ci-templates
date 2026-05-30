@@ -95,6 +95,15 @@ on:
           colocate-repo (旧パターン) と併用可能だが、新規利用ではこちらを推奨。
         type: string
         default: ''
+      cloudsql-instances:
+        description: |
+          Cloud Run に接続する Cloud SQL インスタンスの接続名（カンマ区切り）。
+          指定すると deploy 時に `--add-cloudsql-instances=<value>` を付与し、
+          コンテナ内の unix socket `/cloudsql/<connection-name>` を有効化する。
+          例: my-project:asia-northeast1:contacts
+          ※ ランタイム SA に roles/cloudsql.client が必要。空なら付与しない（後方互換）。
+        type: string
+        default: ''
     secrets:
       COLOCATE_TOKEN:
         description: |
@@ -351,6 +360,8 @@ jobs:
           region: ${{ steps.region.outputs.value }}
           env_vars: ${{ inputs.env-vars }}
           secrets: ${{ inputs.secrets-yaml }}
+          # Cloud SQL 接続（指定時のみ --add-cloudsql-instances を付与。空なら no-op）
+          flags: ${{ inputs.cloudsql-instances != '' && format('--add-cloudsql-instances={0}', inputs.cloudsql-instances) || '' }}
 
       - name: Route 100% traffic to latest Ready revision
         if: inputs.route-to-latest
