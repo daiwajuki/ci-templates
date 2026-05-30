@@ -53,6 +53,15 @@ const KNOWN_WORKFLOWS = new Set([
 const USES_PATTERN =
     /daiwajuki\/ci-templates\/\.github\/workflows\/([a-z0-9-]+)\.yml@(\S+)/gi;
 
+// origin URL から <owner>/<repo> を抽出する。受け付ける形式:
+//   https://github.com/<owner>/<repo>(.git)?
+//   git@github.com:<owner>/<repo>(.git)?
+//   ssh://git@github.com/<owner>/<repo>(.git)?
+const GITHUB_REMOTE_PATTERN =
+    /github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/i;
+
+const SELF_REPO = "daiwajuki/ci-templates";
+
 /**
  * @typedef {{ name: string; refs: Set<string> }} WorkflowUsage
  * @typedef {{ repo: string; usages: Map<string, WorkflowUsage> }} RepoActual
@@ -68,20 +77,55 @@ async function loadAdopters() {
     return map;
 }
 
+/**
+ * ディレクトリの `origin` remote から `<owner>/<repo>` を解決する。
+ * git リポジトリでない / origin 未設定 / GitHub 以外の URL は null を返す。
+ *
+ * ディレクトリ名 ≠ repo 名のケース (例: `_auth/` → `daiwajuki/daiwajuki-auth`) に
+ * 対応するための入口。ディレクトリ名で `daiwajuki/<dirname>` を組み立てると
+ * adopters.json の正しい repo 名と一致せず偽の missing/stale が湧く。
+ */
+function resolveRepoFullName(dirPath) {
+    let remoteUrl;
+    try {
+        remoteUrl = execSync(`git -C "${dirPath}" remote get-url origin`, {
+            encoding: "utf8",
+            stdio: ["pipe", "pipe", "pipe"],
+        }).trim();
+    } catch {
+        return null;
+    }
+    const m = remoteUrl.match(GITHUB_REMOTE_PATTERN);
+    if (!m) return null;
+    return `${m[1]}/${m[2]}`;
+}
+
 async function scanLocal() {
     /** @type {Map<string, RepoActual>} */
     const repos = new Map();
     const entries = await readdir(DEVELOP_DIR, { withFileTypes: true });
     for (const entry of entries) {
         if (!entry.isDirectory()) continue;
-        if (entry.name === "_ci-templates") continue; // 自分自身を除く
-        const wfDir = path.join(DEVELOP_DIR, entry.name, ".github", "workflows");
+        if (entry.name === "_ci-templates") continue; // 自分自身を高速短絡 (後段の SELF_REPO 判定も保険として残す)
+        const dirPath = path.join(DEVELOP_DIR, entry.name);
+        const wfDir = path.join(dirPath, ".github", "workflows");
         let wfFiles;
         try {
             wfFiles = await readdir(wfDir);
         } catch {
             continue;
         }
+
+        const repoKey = resolveRepoFullName(dirPath);
+        if (!repoKey) {
+            console.error(
+                `[scan-local] skip ${entry.name}: cannot resolve GitHub origin remote ` +
+                `(no git repo, no origin, or non-GitHub URL)`
+            );
+            continue;
+        }
+        if (repoKey.toLowerCase() === SELF_REPO) continue;
+
         for (const file of wfFiles) {
             if (!file.endsWith(".yml") && !file.endsWith(".yaml")) continue;
             const filePath = path.join(wfDir, file);
@@ -93,9 +137,6 @@ async function scanLocal() {
             }
             for (const m of content.matchAll(USES_PATTERN)) {
                 const [, name, ref] = m;
-                // local の dir name → adopters.json の repo 名はそのまま owner なし
-                // adopters.json は "daiwajuki/<DirName>" 形式 (大文字小文字も含めて exact match)
-                const repoKey = `daiwajuki/${entry.name}`;
                 let actual = repos.get(repoKey);
                 if (!actual) {
                     actual = { repo: repoKey, usages: new Map() };
