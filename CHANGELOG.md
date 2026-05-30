@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/daiwajuki/ci-templates/compare/v0.14.1...v0.15.0) (2026-05-30)
+
+
+### Added
+
+* **deploy-next:** add cloudsql-instances input for Cloud SQL unix socket ([#62](https://github.com/daiwajuki/ci-templates/issues/62)) ([b220c0f](https://github.com/daiwajuki/ci-templates/commit/b220c0f644c71b00bf3d8b241b9de91b5cc26f4a))
+
 ## [0.14.1](https://github.com/daiwajuki/ci-templates/compare/v0.14.0...v0.14.1) (2026-05-30)
 
 
