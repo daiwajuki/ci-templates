@@ -56,6 +56,25 @@ jobs:
       COLOCATE_TOKEN: ${{ secrets.DS_REPO_TOKEN }}
 ```
 
+## Cloud SQL 接続（unix socket）
+
+Cloud SQL に接続するアプリは `cloudsql-instances` に接続名を指定する。`--add-cloudsql-instances` が付与され、コンテナ内 `/cloudsql/<connection-name>` の unix socket が有効になる：
+
+```yaml
+jobs:
+  deploy:
+    uses: daiwajuki/ci-templates/.github/workflows/deploy-cloudrun-next.yml@v0
+    with:
+      build-mode: image
+      service-name: daiwa-ops-app
+      cloudsql-instances: integratedconstructionplatform:asia-northeast1:contacts
+      secrets-yaml: |
+        DATABASE_URL=daiwa-ops-app-database-url:latest
+      # DATABASE_URL は postgresql://USER:PW@/DB?host=/cloudsql/<connection-name> 形式
+```
+
+※ ランタイム SA に `roles/cloudsql.client` が必要。複数インスタンスはカンマ区切り。
+
 ## inputs 一覧
 
 | input | 型 | デフォルト | 説明 |
@@ -70,6 +89,7 @@ jobs:
 | `build-context` | string | `''` | image モード時のビルドコンテキスト。空なら source-path を使用。`.` を指定するとリポジトリルート全体 |
 | `env-vars` | string | `''` | Cloud Run env_vars |
 | `secrets-yaml` | string | `''` | Secret Manager 注入 |
+| `cloudsql-instances` | string | `''` | 接続する Cloud SQL インスタンスの接続名（カンマ区切り）。指定時に `--add-cloudsql-instances` を付与し unix socket `/cloudsql/<conn>` を有効化。ランタイム SA に `roles/cloudsql.client` が必要。例: `proj:asia-northeast1:contacts` |
 | `smoke-path` | string | `'/'` | スモーク対象パス |
 | `smoke-expected-statuses` | string | `'200 302 307'` | 成功と判定する HTTP ステータス（スペース区切り）|
 | `enable-rollback` | boolean | `true` | 失敗時に前リビジョンへ戻す |
