@@ -33,6 +33,11 @@
     {
       "repo": "daiwajuki/ICPBlankMap",
       "uses": ["ci-next", "deploy-cloudrun-next"]
+    },
+    {
+      "repo": "daiwajuki/daiwajuki-auth",
+      "uses": ["ci-next"],
+      "note": "ローカルディレクトリ名 _auth / GitHub 上は daiwajuki-auth。共通認証基盤 (@daiwajuki/auth)。"
     }
   ]
 }
