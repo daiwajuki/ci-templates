@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/daiwajuki/ci-templates/compare/v0.13.0...v0.14.0) (2026-05-30)
+
+
+### Added
+
+* **adopters:** daiwajuki/daiwajuki-auth を notify 対象に追加 ([#58](https://github.com/daiwajuki/ci-templates/issues/58)) ([55fe5b6](https://github.com/daiwajuki/ci-templates/commit/55fe5b6c1da7a9a9f13fc76c97b75d27d297dbe6))
+
 ## [0.13.0](https://github.com/daiwajuki/ci-templates/compare/v0.12.0...v0.13.0) (2026-05-28)
 
 
