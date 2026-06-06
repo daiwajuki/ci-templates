@@ -169,9 +169,9 @@ _ci-templates/
 | **E** | 残り 12 プロジェクトに横展開・FastAPI / Laravel 用 CI 追加 | 🚧 進行中（6/18 採用、CI/Deploy 6 種公開済み） |
 | **F** | release-please / Renovate 配給・`audit-ci-drift.mjs` 有効化 | 🚧 進行中（release-please 完了、audit-ci-drift は [設計済み](docs/audit-ci-drift-design.md)、Renovate 配給方式は未定） |
 
-## 採用状況（最終確認: 2026-05-26、`audit-ci-drift.mjs --remote`）
+## 採用状況（最終確認: 2026-06-06、`audit-ci-drift.mjs --remote`）
 
-各プロジェクトの `.github/workflows/*.yml` に `daiwajuki/ci-templates` の `uses:` を持つかで実測（全 18 プロジェクト中 7 件採用 + 1 件 pending push）：
+各プロジェクトの `.github/workflows/*.yml` に `daiwajuki/ci-templates` の `uses:` を持つかで実測（全 18 プロジェクト中 9 件採用）：
 
 | プロジェクト | 状態 | 採用 workflow（reusable 名） | pin | 備考 |
 |---|---|---|---|---|
@@ -181,8 +181,8 @@ _ci-templates/
 | PayrollManager | ✅ 採用済み | ci-next | `@v0` | Phase E |
 | BidFlow | ✅ 採用済み | ci-fastapi, deploy-cloudrun-next, deploy-cloudrun-fastapi | `@v0` | Phase E |
 | HydraulicCalculation | ✅ 採用済み | ci-next, deploy-cloudrun-next | `@v0` | Phase E |
-| ICPSitePhotos | ⚠️ 採用済み（古い pin） | ci-next | `@v0.6.0` | floating tag への切替推奨。v0.7.0+ の hardening を受け取れていない |
-| daiwa-ops-app | 🚧 ローカルのみ | ci-next, deploy-cloudrun-next | `@v0` | GitHub にまだ push されていない。push 後に audit-drift が missing 検出するので、その時点で `adopters.json` に追加 |
+| ICPSitePhotos | ✅ 採用済み | deploy-cloudrun-next | `@v0` | issue #64 で adopters.json に追加（2026-06-06） |
+| daiwa-ops-app | ✅ 採用済み | ci-next, deploy-cloudrun-next | `@v0` | issue #64 で adopters.json に追加（2026-06-06） |
 | 残り 10 | ⏳ 未採用 | — | — | Phase E で順次横展開（BidCalc / BuildDeck / CompanyWebsite / ContractHub / DailyLogs / genba-chosa / ICPBlankMap / ICPContacts / ICPForms / Orders / StridePlan） |
 
 確認コマンド:
