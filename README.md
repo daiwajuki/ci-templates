@@ -12,6 +12,7 @@
 | Reusable Workflow | `.github/workflows/deploy-cloudrun-next.yml` | live 参照（`uses:`） |
 | Reusable Workflow | `.github/workflows/deploy-cloudrun-laravel.yml` | live 参照（`uses:`） |
 | Reusable Workflow | `.github/workflows/deploy-cloudrun-fastapi.yml` | live 参照（`uses:`） |
+| Reusable Workflow | `.github/workflows/secret-scan.yml` | live 参照（`uses:`） |
 | Composite Action | `.github/actions/setup-node-volta/` | live 参照（`uses:`） |
 | Dockerfile テンプレート | `dockerfiles/` | copy 配布（Phase C〜） |
 | docker-compose テンプレート | `docker-compose/` | copy 配布（Phase C〜） |

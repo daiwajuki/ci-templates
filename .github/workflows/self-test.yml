@@ -65,3 +65,12 @@ jobs:
       run-ruff: false
       run-mypy: false
       run-tests: false
+
+  test-secret-scan:
+    name: Test secret-scan.yml (self scan)
+    needs: lint-workflows
+    # この repo 自身（fixtures / docs 含む）を gitleaks でスキャンし、
+    # ライセンス不要 CLI 経路と clean repo での exit 0 を検証する。
+    uses: ./.github/workflows/secret-scan.yml
+    permissions:
+      contents: read

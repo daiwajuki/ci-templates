@@ -39,7 +39,8 @@
               "ci-fastapi",
               "deploy-cloudrun-next",
               "deploy-cloudrun-laravel",
-              "deploy-cloudrun-fastapi"
+              "deploy-cloudrun-fastapi",
+              "secret-scan"
             ]
           }
         },
