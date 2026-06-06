@@ -1,6 +1,6 @@
 {
   "$schema": "./adopters.schema.json",
-  "_comment": "_ci-templates 採用側リスト。notify-adopters.yml が release: published で各 repo に Issue 投稿する宛先。新規採用が増えたら uses も含めて追記する。実態とのドリフト検出は scripts/audit-ci-drift.mjs --remote で行う。最終実測: 2026-05-28 (audit-ci-drift.mjs --remote)。daiwa-ops-app はローカル only repo (GitHub に未 push) のため除外、push 後に audit-drift が自動検出して missing 報告するのでその時点で再追加する。",
+  "_comment": "_ci-templates 採用側リスト。notify-adopters.yml が release: published で各 repo に Issue 投稿する宛先。新規採用が増えたら uses も含めて追記する。実態とのドリフト検出は scripts/audit-ci-drift.mjs --remote で行う。最終実測: 2026-06-06 (audit-ci-drift.mjs --remote、issue #64 対応)。",
   "adopters": [
     {
       "repo": "daiwajuki/Portal",
@@ -38,6 +38,14 @@
       "repo": "daiwajuki/daiwajuki-auth",
       "uses": ["ci-next"],
       "note": "ローカルディレクトリ名 _auth / GitHub 上は daiwajuki-auth。共通認証基盤 (@daiwajuki/auth)。"
+    },
+    {
+      "repo": "daiwajuki/ICPSitePhotos",
+      "uses": ["deploy-cloudrun-next"]
+    },
+    {
+      "repo": "daiwajuki/daiwa-ops-app",
+      "uses": ["ci-next", "deploy-cloudrun-next"]
     }
   ]
 }
