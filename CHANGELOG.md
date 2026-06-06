@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.1](https://github.com/daiwajuki/ci-templates/compare/v0.16.0...v0.16.1) (2026-06-06)
+
+
+### Fixed
+
+* **adopters:** add ICPSitePhotos and daiwa-ops-app to resolve drift ([#67](https://github.com/daiwajuki/ci-templates/issues/67)) ([04a9748](https://github.com/daiwajuki/ci-templates/commit/04a9748e04aba35caffc088edd0dc5104e521945))
+
 ## [0.16.0](https://github.com/daiwajuki/ci-templates/compare/v0.15.0...v0.16.0) (2026-06-06)
 
 
