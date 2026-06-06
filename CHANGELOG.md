@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0](https://github.com/daiwajuki/ci-templates/compare/v0.15.0...v0.16.0) (2026-06-06)
+
+
+### Added
+
+* **secret-scan:** add license-free gitleaks reusable workflow ([#65](https://github.com/daiwajuki/ci-templates/issues/65)) ([ea90523](https://github.com/daiwajuki/ci-templates/commit/ea90523c1794450ef01f9e05c7f8b33f416ceaf8))
+
 ## [0.15.0](https://github.com/daiwajuki/ci-templates/compare/v0.14.1...v0.15.0) (2026-05-30)
 
 
