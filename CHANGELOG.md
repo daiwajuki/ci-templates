@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0](https://github.com/daiwajuki/ci-templates/compare/v0.16.1...v0.17.0) (2026-06-20)
+
+
+### Added
+
+* **deploy-cloudrun-fastapi:** add optional Cloud Run resource inputs ([#70](https://github.com/daiwajuki/ci-templates/issues/70)) ([38f29ab](https://github.com/daiwajuki/ci-templates/commit/38f29ab23586355e079644c9e30be47a3441f849))
+
 ## [0.16.1](https://github.com/daiwajuki/ci-templates/compare/v0.16.0...v0.16.1) (2026-06-06)
 
 
