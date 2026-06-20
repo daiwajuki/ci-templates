@@ -29,6 +29,24 @@ on:
           deploy-cloudrun の env_vars に渡される。
         type: string
         default: ''
+      cpu:
+        description: 'Cloud Run の CPU 数（例: 2）。空なら既存リビジョンの設定を継承。'
+        type: string
+        default: ''
+      memory:
+        description: 'Cloud Run のメモリ（例: 2Gi）。空なら既存リビジョンの設定を継承。'
+        type: string
+        default: ''
+      concurrency:
+        description: 'Cloud Run のインスタンスあたり同時リクエスト数（例: 8）。空なら継承。'
+        type: string
+        default: ''
+      cloudrun-timeout:
+        description: |
+          Cloud Run のリクエストタイムアウト秒（例: 300）。空なら継承。
+          ジョブ全体の timeout-minutes とは別物（こちらは 1 リクエストの上限）。
+        type: string
+        default: ''
       secrets-yaml:
         description: Secret Manager 注入定義（KEY=secret-name:version 改行区切り）
         type: string
@@ -233,6 +251,27 @@ jobs:
           cache-from: type=gha,scope=${{ inputs.service-name }}
           cache-to: type=gha,mode=max,scope=${{ inputs.service-name }}
 
+      # Cloud Run のリソースフラグ (--cpu / --memory / --concurrency / --timeout) を
+      # 指定された入力だけ組み立てる。未指定の項目は付与せず既存リビジョンの設定を継承する
+      # (deploy-cloudrun は --image のみ指定時に現行設定を引き継ぐため、後方互換)。
+      - name: Compute Cloud Run resource flags
+        id: resource-flags
+        env:
+          CPU: ${{ inputs.cpu }}
+          MEMORY: ${{ inputs.memory }}
+          CONCURRENCY: ${{ inputs.concurrency }}
+          CR_TIMEOUT: ${{ inputs.cloudrun-timeout }}
+        run: |
+          set -euo pipefail
+          flags=""
+          if [ -n "$CPU" ]; then flags="$flags --cpu=$CPU"; fi
+          if [ -n "$MEMORY" ]; then flags="$flags --memory=$MEMORY"; fi
+          if [ -n "$CONCURRENCY" ]; then flags="$flags --concurrency=$CONCURRENCY"; fi
+          if [ -n "$CR_TIMEOUT" ]; then flags="$flags --timeout=$CR_TIMEOUT"; fi
+          flags="$(echo "$flags" | xargs || true)"  # 前後空白 trim
+          echo "value=$flags" >> "$GITHUB_OUTPUT"
+          echo "Cloud Run resource flags: ${flags:-<none, inherit existing>}"
+
       - name: Deploy to Cloud Run
         id: deploy
         uses: google-github-actions/deploy-cloudrun@v2
@@ -242,6 +281,8 @@ jobs:
           region: ${{ steps.region.outputs.value }}
           env_vars: ${{ inputs.env-vars }}
           secrets: ${{ inputs.secrets-yaml }}
+          # 空文字なら追加フラグなし（既存設定を継承）。後方互換。
+          flags: ${{ steps.resource-flags.outputs.value }}
 
       - name: Route 100% traffic to latest Ready revision
         if: inputs.route-to-latest
