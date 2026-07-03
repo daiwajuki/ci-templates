@@ -104,6 +104,13 @@ on:
           ※ ランタイム SA に roles/cloudsql.client が必要。空なら付与しない（後方互換）。
         type: string
         default: ''
+      request-timeout:
+        description: |
+          Cloud Run のリクエストタイムアウト（秒。1〜3600。省略時は Cloud Run 既定の 300）。
+          長時間の AI 解析等で 1 リクエストが 300 秒を超える場合に延長する。
+          指定すると deploy 時に `--timeout=<value>` を付与する。空なら付与しない（後方互換）。
+        type: string
+        default: ''
     secrets:
       COLOCATE_TOKEN:
         description: |
@@ -360,8 +367,9 @@ jobs:
           region: ${{ steps.region.outputs.value }}
           env_vars: ${{ inputs.env-vars }}
           secrets: ${{ inputs.secrets-yaml }}
-          # Cloud SQL 接続（指定時のみ --add-cloudsql-instances を付与。空なら no-op）
-          flags: ${{ inputs.cloudsql-instances != '' && format('--add-cloudsql-instances={0}', inputs.cloudsql-instances) || '' }}
+          # Cloud SQL 接続 + リクエストタイムアウトを条件付きで付与（各 input 空なら no-op、後方互換）
+          flags: >-
+            ${{ inputs.cloudsql-instances != '' && format('--add-cloudsql-instances={0} ', inputs.cloudsql-instances) || '' }}${{ inputs.request-timeout != '' && format('--timeout={0}', inputs.request-timeout) || '' }}
 
       - name: Route 100% traffic to latest Ready revision
         if: inputs.route-to-latest
