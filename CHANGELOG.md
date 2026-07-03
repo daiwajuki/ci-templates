@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0](https://github.com/daiwajuki/ci-templates/compare/v0.17.0...v0.18.0) (2026-07-03)
+
+
+### Added
+
+* **deploy-next:** Cloud Run リクエストタイムアウトを request-timeout input で設定可能に ([#72](https://github.com/daiwajuki/ci-templates/issues/72)) ([9a6c41f](https://github.com/daiwajuki/ci-templates/commit/9a6c41feb4df0c38f8af43235252e25001e97895))
+
 ## [0.17.0](https://github.com/daiwajuki/ci-templates/compare/v0.16.1...v0.17.0) (2026-06-20)
 
 
