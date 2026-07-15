@@ -60,6 +60,25 @@ on:
         description: デプロイ成功時に latest リビジョンへ 100% トラフィックを向けるか
         type: boolean
         default: true
+      sync-job-names:
+        description: |
+          デプロイしたサービスと同じイメージへ追従させる Cloud Run ジョブ名（カンマ / 改行区切り）。
+          空文字ならジョブ同期は行わない（既定 = 従来どおりの挙動）。
+
+          Cloud Run ジョブは作成時のイメージのまま固定され、サービスのデプロイでは一切更新
+          されない。そのため seed / backfill をジョブ経由で実行する運用は「ジョブのイメージ =
+          最新の master」を暗黙に前提にしながら、その前提が保証されていない。シーダーや
+          コマンドを master へ足すたびにジョブだけが取り残され、
+          `Class "Database\Seeders\XxxSeeder" does not exist` で落ちる。
+
+          実例: 2026-07-15、adopter の本番 seed 実行が失敗した。サービスは最新なのにジョブは
+          該当クラス追加以前のイメージを指していた（手動 jobs update で復旧したが、それは
+          その時点のイメージに固定し直しただけで、次の追加で再発する）。
+
+          例:
+            sync-job-names: my-api-seed
+        type: string
+        default: ''
       timeout-minutes:
         description: ジョブのタイムアウト（分）
         type: number
@@ -374,6 +393,61 @@ jobs:
             sleep 5
           done
 
+      # ─── Cloud Run ジョブのイメージ追従 ──────────────────────────────────
+      # スモーク通過後にだけ走らせる。壊れたイメージをジョブへ伝播させないため、
+      # 位置をここより前に動かさないこと（rollback は failure() 限定なので後段でよい）。
+      - name: Sync Cloud Run jobs to deployed image
+        id: syncjobs
+        if: inputs.sync-job-names != ''
+        env:
+          JOB_NAMES: ${{ inputs.sync-job-names }}
+          SERVICE: ${{ inputs.service-name }}
+          REGION: ${{ steps.region.outputs.value }}
+        run: |
+          set -euo pipefail
+
+          # サービスが実際に配信しているイメージを正本にする（source モードでは Buildpacks が
+          # 生成したイメージ参照になるため、caller 側でタグを組み立てさせない）。
+          IMAGE=$(gcloud run services describe "${SERVICE}" \
+            --region="${REGION}" \
+            --format='value(spec.template.spec.containers[0].image)')
+          if [ -z "${IMAGE}" ]; then
+            echo "::error::Failed to resolve deployed image for ${SERVICE}"
+            exit 1
+          fi
+          echo "Deployed image: ${IMAGE}"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+          SYNCED=""
+          # カンマ / 改行のどちらの区切りでも受ける
+          for JOB in $(echo "${JOB_NAMES}" | tr ',\n' '  '); do
+            [ -z "${JOB}" ] && continue
+
+            # ジョブ未作成でも deploy 全体は止めない（ジョブ作成は gcloud で別途行う運用）。
+            if ! gcloud run jobs describe "${JOB}" --region="${REGION}" >/dev/null 2>&1; then
+              echo "::warning::Cloud Run job '${JOB}' not found in ${REGION} — skipped (create it with 'gcloud run jobs create')"
+              continue
+            fi
+
+            # 既存ジョブの env / Cloud SQL 接続 / SA / リソース上限は --image だけの更新なら保持される。
+            gcloud run jobs update "${JOB}" \
+              --region="${REGION}" \
+              --image="${IMAGE}" \
+              --quiet
+
+            # 更新が実際に効いたことを確認する（silently no-op していないこと）。
+            CURRENT=$(gcloud run jobs describe "${JOB}" \
+              --region="${REGION}" \
+              --format='value(spec.template.spec.template.spec.containers[0].image)')
+            if [ "${CURRENT}" != "${IMAGE}" ]; then
+              echo "::error::${JOB} image mismatch: expected ${IMAGE}, got ${CURRENT}"
+              exit 1
+            fi
+            echo "✅ ${JOB} → ${IMAGE}"
+            SYNCED="${SYNCED}${JOB} "
+          done
+          echo "synced=${SYNCED}" >> "$GITHUB_OUTPUT"
+
       # ─── 失敗時の rollback ──────────────────────────────────────────────
       - name: Rollback on failure
         # `failure()` だけだと WIF validation / auth / build など pre-deploy 段階の
@@ -423,4 +497,7 @@ jobs:
             echo "| Region | \`${{ steps.region.outputs.value }}\` |"
             echo "| URL | ${{ steps.deploy.outputs.url }} |"
             echo "| Status | ${{ job.status }} |"
+            if [ -n "${{ inputs.sync-job-names }}" ]; then
+              echo "| Synced jobs | \`${{ steps.syncjobs.outputs.synced }}\` |"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
