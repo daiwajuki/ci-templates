@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0](https://github.com/daiwajuki/ci-templates/compare/v0.18.0...v0.19.0) (2026-07-15)
+
+
+### Added
+
+* **laravel:** デプロイしたイメージへCloud Runジョブを追従させる sync-job-names を追加 ([#74](https://github.com/daiwajuki/ci-templates/issues/74)) ([aa0f962](https://github.com/daiwajuki/ci-templates/commit/aa0f96258b2474131f8a399be7d08a5aec848202))
+
 ## [0.18.0](https://github.com/daiwajuki/ci-templates/compare/v0.17.0...v0.18.0) (2026-07-03)
 
 
