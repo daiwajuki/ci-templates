@@ -23,6 +23,31 @@ on:
         description: build ステップを実行するか
         type: boolean
         default: true
+      run-test:
+        description: |
+          test ステップ（npm test）を実行するか。
+          既存 caller への影響を避けるため既定は false（opt-in）。
+          package.json に test スクリプトが無ければ true でもスキップされる。
+        type: boolean
+        default: false
+      run-audit:
+        description: |
+          npm audit ステップを実行するか。
+          既存 caller への影響を避けるため既定は false（opt-in）。
+        type: boolean
+        default: false
+      audit-level:
+        description: npm audit --audit-level に渡す最小重要度
+        type: string
+        default: 'high'
+      legacy-peer-deps:
+        description: |
+          npm ci に --legacy-peer-deps を付与するか。
+          Next.js メジャーバージョンを先取りした consumer で next-auth 等の
+          peer dependency 宣言が追従しておらず ERESOLVE で落ちるケース向け。
+          既定は false（既存 caller への影響なし）。
+        type: boolean
+        default: false
       build-env-file:
         description: ビルド時に .env.local としてコピーする env ファイルのパス（不要なら空）
         type: string
@@ -49,6 +74,21 @@ on:
         description: |
           colocate-repo の配置先（GITHUB_WORKSPACE からの相対パス）。
           例: "../_design-system" で workspace の親ディレクトリに兄弟配置。
+        type: string
+        default: ''
+      colocate-repo-2:
+        description: |
+          2つ目の colocate 対象リポジトリ（"owner/repo" 形式）。
+          _auth + _design-system の両方を file: 依存する consumer（14 プロジェクト共通構成）向け。
+          未指定なら何もしない（既存 caller への影響なし）。
+        type: string
+        default: ''
+      colocate-ref-2:
+        description: colocate-repo-2 のチェックアウト ref（タグ・ブランチ・SHA）
+        type: string
+        default: ''
+      colocate-path-2:
+        description: colocate-repo-2 の配置先（GITHUB_WORKSPACE からの相対パス）
         type: string
         default: ''
     secrets:
@@ -95,7 +135,7 @@ jobs:
       # COLOCATE_TOKEN PAT 方式と並行サポート（App 優先）。両方未指定なら github.token。
       # Detect/Mint の重複ロジックは mint-app-token composite に集約 (Phase 2)。
       - name: Mint App installation token (colocate)
-        if: inputs.colocate-repo != ''
+        if: inputs.colocate-repo != '' || inputs.colocate-repo-2 != ''
         id: app-token
         uses: daiwajuki/ci-templates/.github/actions/mint-app-token@v0
         with:
@@ -125,6 +165,30 @@ jobs:
           cp -r "$GITHUB_WORKSPACE/__colocate__" "$dest"
           rm -rf "$GITHUB_WORKSPACE/__colocate__"
 
+      # _auth + _design-system の両方が必要な consumer 向け（14 プロジェクト共通構成）。
+      # colocate-repo と独立した2本目の checkout/配置（同一トークンを再利用）。
+      - name: Checkout colocate-repo-2
+        if: inputs.colocate-repo-2 != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.colocate-repo-2 }}
+          ref: ${{ inputs.colocate-ref-2 }}
+          token: ${{ steps.app-token.outputs.token || secrets.COLOCATE_TOKEN || github.token }}
+          path: __colocate2__
+
+      - name: Place colocate-repo-2 at expected path
+        if: inputs.colocate-repo-2 != ''
+        working-directory: ${{ github.workspace }}
+        env:
+          COLOCATE_PATH_2: ${{ inputs.colocate-path-2 }}
+        run: |
+          set -euo pipefail
+          dest="$GITHUB_WORKSPACE/$COLOCATE_PATH_2"
+          mkdir -p "$(dirname "$dest")"
+          rm -rf "$dest"
+          cp -r "$GITHUB_WORKSPACE/__colocate2__" "$dest"
+          rm -rf "$GITHUB_WORKSPACE/__colocate2__"
+
       - name: Setup Node
         uses: daiwajuki/ci-templates/.github/actions/setup-node-volta@v0
         with:
@@ -132,7 +196,7 @@ jobs:
           working-directory: ${{ inputs.working-directory }}
 
       - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit --no-fund
+        run: npm ci --prefer-offline --no-audit --no-fund ${{ inputs.legacy-peer-deps && '--legacy-peer-deps' || '' }}
         env:
           GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || github.token }}
 
@@ -141,8 +205,12 @@ jobs:
         run: |
           HAS_LINT=$(node -e "const s=require('./package.json').scripts||{};process.stdout.write(s.lint?'true':'false')")
           HAS_TYPECHECK=$(node -e "const s=require('./package.json').scripts||{};process.stdout.write(s.typecheck?'true':'false')")
-          echo "has-lint=$HAS_LINT" >> "$GITHUB_OUTPUT"
-          echo "has-typecheck=$HAS_TYPECHECK" >> "$GITHUB_OUTPUT"
+          HAS_TEST=$(node -e "const s=require('./package.json').scripts||{};process.stdout.write(s.test?'true':'false')")
+          {
+            echo "has-lint=$HAS_LINT"
+            echo "has-typecheck=$HAS_TYPECHECK"
+            echo "has-test=$HAS_TEST"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Lint
         if: inputs.run-lint && steps.scripts.outputs.has-lint == 'true'
@@ -151,6 +219,14 @@ jobs:
       - name: Typecheck
         if: inputs.run-typecheck && steps.scripts.outputs.has-typecheck == 'true'
         run: npm run typecheck
+
+      - name: Test
+        if: inputs.run-test && steps.scripts.outputs.has-test == 'true'
+        run: npm test
+
+      - name: Audit
+        if: inputs.run-audit
+        run: npm audit --audit-level="${{ inputs.audit-level }}"
 
       - name: Copy env file for build
         if: inputs.run-build && inputs.build-env-file != ''
