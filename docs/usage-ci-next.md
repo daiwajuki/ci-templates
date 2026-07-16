@@ -108,6 +108,11 @@ jobs:
 
 `colocate-path` が `../*` の場合、ワークスペースの親に配置される。プライベートリポジトリの場合は `COLOCATE_TOKEN` 必須。
 
+colocate したリポジトリに `package.json` があれば、`npm install --omit=dev --legacy-peer-deps` を自動実行する。
+colocate-repo は npm workspaces ではなく consumer の `file:` 依存として載るだけなので、consumer 側の
+`npm ci` では colocate 側自身の依存関係（例: `_auth` の `zod` / `drizzle-orm`）が解決されない。
+TS ソースを直接 import する vitest 等でこれらの import が失敗するのを防ぐための自動インストール。
+
 ### `_auth` + `_design-system` の両方を co-locate する
 
 `@daiwajuki/auth`（`file:../../_auth`）と `@daiwajuki/ui-design`（`file:../../_design-system`）の両方に依存する
