@@ -32,6 +32,9 @@ jobs:
 | `colocate-repo` | string | `''` | lint/typecheck/build 前に sibling パスへ配置する外部リポジトリ（`owner/repo` 形式） |
 | `colocate-ref` | string | `''` | colocate-repo のチェックアウト ref（タグ・ブランチ・SHA） |
 | `colocate-path` | string | `''` | colocate-repo の配置先（`GITHUB_WORKSPACE` からの相対パス） |
+| `colocate-repo-2` | string | `''` | 2つ目の colocate 対象リポジトリ。`_auth` + `_design-system` の両方を `file:` 依存する consumer 向け |
+| `colocate-ref-2` | string | `''` | colocate-repo-2 のチェックアウト ref |
+| `colocate-path-2` | string | `''` | colocate-repo-2 の配置先 |
 
 ## secrets 一覧
 
@@ -103,6 +106,28 @@ jobs:
 3. `__colocate__/` を削除
 
 `colocate-path` が `../*` の場合、ワークスペースの親に配置される。プライベートリポジトリの場合は `COLOCATE_TOKEN` 必須。
+
+### `_auth` + `_design-system` の両方を co-locate する
+
+`@daiwajuki/auth`（`file:../../_auth`）と `@daiwajuki/ui-design`（`file:../../_design-system`）の両方に依存する
+consumer（14 プロジェクト共通構成）向け。`colocate-repo-2` は `colocate-repo` と独立して動作し、同じトークン
+（App-mint > `COLOCATE_TOKEN` > `github.token`）を再利用する:
+
+```yaml
+jobs:
+  ci:
+    uses: daiwajuki/ci-templates/.github/workflows/ci-next.yml@v0
+    with:
+      colocate-repo: daiwajuki/daiwajuki-auth
+      colocate-ref: main
+      colocate-path: ../_auth
+      colocate-repo-2: daiwajuki/daiwajuki-UIdesign
+      colocate-ref-2: main
+      colocate-path-2: ../_design-system
+    secrets:
+      external-checkout-app-id: ${{ secrets.DAIWAJUKI_APP_ID }}
+      external-checkout-app-private-key: ${{ secrets.DAIWAJUKI_APP_PRIVATE_KEY }}
+```
 
 ### lint のみ（typecheck・build はスキップ）
 

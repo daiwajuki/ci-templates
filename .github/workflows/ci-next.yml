@@ -68,6 +68,21 @@ on:
           例: "../_design-system" で workspace の親ディレクトリに兄弟配置。
         type: string
         default: ''
+      colocate-repo-2:
+        description: |
+          2つ目の colocate 対象リポジトリ（"owner/repo" 形式）。
+          _auth + _design-system の両方を file: 依存する consumer（14 プロジェクト共通構成）向け。
+          未指定なら何もしない（既存 caller への影響なし）。
+        type: string
+        default: ''
+      colocate-ref-2:
+        description: colocate-repo-2 のチェックアウト ref（タグ・ブランチ・SHA）
+        type: string
+        default: ''
+      colocate-path-2:
+        description: colocate-repo-2 の配置先（GITHUB_WORKSPACE からの相対パス）
+        type: string
+        default: ''
     secrets:
       GH_PACKAGES_TOKEN:
         description: GitHub Packages 読み取り用トークン（org secret。未指定時は github.token で試行）
@@ -112,7 +127,7 @@ jobs:
       # COLOCATE_TOKEN PAT 方式と並行サポート（App 優先）。両方未指定なら github.token。
       # Detect/Mint の重複ロジックは mint-app-token composite に集約 (Phase 2)。
       - name: Mint App installation token (colocate)
-        if: inputs.colocate-repo != ''
+        if: inputs.colocate-repo != '' || inputs.colocate-repo-2 != ''
         id: app-token
         uses: daiwajuki/ci-templates/.github/actions/mint-app-token@v0
         with:
@@ -141,6 +156,30 @@ jobs:
           rm -rf "$dest"
           cp -r "$GITHUB_WORKSPACE/__colocate__" "$dest"
           rm -rf "$GITHUB_WORKSPACE/__colocate__"
+
+      # _auth + _design-system の両方が必要な consumer 向け（14 プロジェクト共通構成）。
+      # colocate-repo と独立した2本目の checkout/配置（同一トークンを再利用）。
+      - name: Checkout colocate-repo-2
+        if: inputs.colocate-repo-2 != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.colocate-repo-2 }}
+          ref: ${{ inputs.colocate-ref-2 }}
+          token: ${{ steps.app-token.outputs.token || secrets.COLOCATE_TOKEN || github.token }}
+          path: __colocate2__
+
+      - name: Place colocate-repo-2 at expected path
+        if: inputs.colocate-repo-2 != ''
+        working-directory: ${{ github.workspace }}
+        env:
+          COLOCATE_PATH_2: ${{ inputs.colocate-path-2 }}
+        run: |
+          set -euo pipefail
+          dest="$GITHUB_WORKSPACE/$COLOCATE_PATH_2"
+          mkdir -p "$(dirname "$dest")"
+          rm -rf "$dest"
+          cp -r "$GITHUB_WORKSPACE/__colocate2__" "$dest"
+          rm -rf "$GITHUB_WORKSPACE/__colocate2__"
 
       - name: Setup Node
         uses: daiwajuki/ci-templates/.github/actions/setup-node-volta@v0
