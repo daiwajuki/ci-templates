@@ -24,6 +24,9 @@ jobs:
 | `run-lint` | boolean | `true` | `npm run lint` を実行するか |
 | `run-typecheck` | boolean | `true` | `npm run typecheck` を実行するか |
 | `run-build` | boolean | `true` | `npm run build` を実行するか |
+| `run-test` | boolean | `false`（opt-in） | `npm test` を実行するか |
+| `run-audit` | boolean | `false`（opt-in） | `npm audit` を実行するか |
+| `audit-level` | string | `'high'` | `npm audit --audit-level` に渡す最小重要度 |
 | `build-env-file` | string | `''` | ビルド時に `.env.local` としてコピーする env ファイルのパス |
 | `build-env` | string | `''` | ビルド時に `.env.local` に追記する KEY=VALUE 複数行（`build-env-file` の後に追記） |
 | `colocate-repo` | string | `''` | lint/typecheck/build 前に sibling パスへ配置する外部リポジトリ（`owner/repo` 形式） |
@@ -112,10 +115,28 @@ jobs:
       run-build: false
 ```
 
+### test / audit を有効化する
+
+`run-test` / `run-audit` は既存 caller への影響を避けるため既定 `false`（opt-in）。  
+テストが DB 等の外部リソースを要さない単体テストのみで完結するプロジェクト向け:
+
+```yaml
+jobs:
+  ci:
+    uses: daiwajuki/ci-templates/.github/workflows/ci-next.yml@v0
+    with:
+      run-test: true
+      run-audit: true
+      audit-level: high
+```
+
+`npm test` が DB 接続等を必要とする場合は、この reusable workflow では対応しない
+（サービスコンテナ等は呼び出し側 workflow で個別に組む、または将来 input で拡張する）。
+
 ## スクリプト自動検出
 
-`lint` / `typecheck` ステップは `package.json` の `scripts` にそのキーが存在する場合のみ実行される。  
-スクリプトが無い場合はスキップされるため、エラーにならない。
+`lint` / `typecheck` / `test` ステップは `package.json` の `scripts` にそのキーが存在する場合のみ実行される。  
+スクリプトが無い場合はスキップされるため、エラーにならない。`audit` はスクリプト検出の対象外（`npm audit` 組み込みコマンドを直接実行）。
 
 ## Volta 対応
 

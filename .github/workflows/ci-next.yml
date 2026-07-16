@@ -23,6 +23,23 @@ on:
         description: build ステップを実行するか
         type: boolean
         default: true
+      run-test:
+        description: |
+          test ステップ（npm test）を実行するか。
+          既存 caller への影響を避けるため既定は false（opt-in）。
+          package.json に test スクリプトが無ければ true でもスキップされる。
+        type: boolean
+        default: false
+      run-audit:
+        description: |
+          npm audit ステップを実行するか。
+          既存 caller への影響を避けるため既定は false（opt-in）。
+        type: boolean
+        default: false
+      audit-level:
+        description: npm audit --audit-level に渡す最小重要度
+        type: string
+        default: 'high'
       build-env-file:
         description: ビルド時に .env.local としてコピーする env ファイルのパス（不要なら空）
         type: string
@@ -141,8 +158,12 @@ jobs:
         run: |
           HAS_LINT=$(node -e "const s=require('./package.json').scripts||{};process.stdout.write(s.lint?'true':'false')")
           HAS_TYPECHECK=$(node -e "const s=require('./package.json').scripts||{};process.stdout.write(s.typecheck?'true':'false')")
-          echo "has-lint=$HAS_LINT" >> "$GITHUB_OUTPUT"
-          echo "has-typecheck=$HAS_TYPECHECK" >> "$GITHUB_OUTPUT"
+          HAS_TEST=$(node -e "const s=require('./package.json').scripts||{};process.stdout.write(s.test?'true':'false')")
+          {
+            echo "has-lint=$HAS_LINT"
+            echo "has-typecheck=$HAS_TYPECHECK"
+            echo "has-test=$HAS_TEST"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Lint
         if: inputs.run-lint && steps.scripts.outputs.has-lint == 'true'
@@ -151,6 +172,14 @@ jobs:
       - name: Typecheck
         if: inputs.run-typecheck && steps.scripts.outputs.has-typecheck == 'true'
         run: npm run typecheck
+
+      - name: Test
+        if: inputs.run-test && steps.scripts.outputs.has-test == 'true'
+        run: npm test
+
+      - name: Audit
+        if: inputs.run-audit
+        run: npm audit --audit-level="${{ inputs.audit-level }}"
 
       - name: Copy env file for build
         if: inputs.run-build && inputs.build-env-file != ''

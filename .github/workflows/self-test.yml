@@ -41,6 +41,8 @@ jobs:
       run-lint: true
       run-typecheck: true
       run-build: true
+      run-test: true
+      run-audit: true
 
   test-ci-laravel:
     name: Test ci-laravel.yml (minimal fixture)
