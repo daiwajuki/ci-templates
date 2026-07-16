@@ -40,6 +40,14 @@ on:
         description: npm audit --audit-level に渡す最小重要度
         type: string
         default: 'high'
+      legacy-peer-deps:
+        description: |
+          npm ci に --legacy-peer-deps を付与するか。
+          Next.js メジャーバージョンを先取りした consumer で next-auth 等の
+          peer dependency 宣言が追従しておらず ERESOLVE で落ちるケース向け。
+          既定は false（既存 caller への影響なし）。
+        type: boolean
+        default: false
       build-env-file:
         description: ビルド時に .env.local としてコピーする env ファイルのパス（不要なら空）
         type: string
@@ -188,7 +196,7 @@ jobs:
           working-directory: ${{ inputs.working-directory }}
 
       - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit --no-fund
+        run: npm ci --prefer-offline --no-audit --no-fund ${{ inputs.legacy-peer-deps && '--legacy-peer-deps' || '' }}
         env:
           GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || github.token }}
 
