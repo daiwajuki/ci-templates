@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.1](https://github.com/daiwajuki/ci-templates/compare/v0.20.0...v0.20.1) (2026-07-17)
+
+
+### Fixed
+
+* **ci-next:** colocate-repo依存インストールステップの欠落を復元する ([#78](https://github.com/daiwajuki/ci-templates/issues/78)) ([5bd71bb](https://github.com/daiwajuki/ci-templates/commit/5bd71bb3108e1360596c1a31fcc0825700f938be))
+
 ## [0.20.0](https://github.com/daiwajuki/ci-templates/compare/v0.19.0...v0.20.0) (2026-07-17)
 
 
