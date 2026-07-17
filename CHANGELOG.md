@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.0](https://github.com/daiwajuki/ci-templates/compare/v0.19.0...v0.20.0) (2026-07-17)
+
+
+### Added
+
+* **ci-next:** npm test / npm audit をオプトインで追加する ([#76](https://github.com/daiwajuki/ci-templates/issues/76)) ([5274a77](https://github.com/daiwajuki/ci-templates/commit/5274a779d52c7af87beebc004fbe30fc855356a0))
+
 ## [0.19.0](https://github.com/daiwajuki/ci-templates/compare/v0.18.0...v0.19.0) (2026-07-15)
 
 
