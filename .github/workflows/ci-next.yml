@@ -195,6 +195,29 @@ jobs:
           fallback-version: ${{ inputs.node-version }}
           working-directory: ${{ inputs.working-directory }}
 
+      # colocate-repo は file: 依存として consumer の package.json に載るだけで、
+      # npm workspaces ではないため consumer の npm ci では colocate 側自身の
+      # 依存関係が解決されない（ローカル開発機では colocate リポジトリが個別に
+      # npm install 済みのため気づきにくい）。TS ソースを直接 import する consumer
+      # （vitest 等）が colocate 側の import（例: zod, drizzle-orm）を解決できず
+      # 落ちるのを防ぐため、package.json があれば個別に依存関係を入れる。
+      - name: Install colocate-repo dependencies
+        if: inputs.colocate-repo != '' || inputs.colocate-repo-2 != ''
+        working-directory: ${{ github.workspace }}
+        env:
+          COLOCATE_PATH: ${{ inputs.colocate-path }}
+          COLOCATE_PATH_2: ${{ inputs.colocate-path-2 }}
+        run: |
+          set -euo pipefail
+          for p in "$COLOCATE_PATH" "$COLOCATE_PATH_2"; do
+            [ -z "$p" ] && continue
+            dir="$GITHUB_WORKSPACE/$p"
+            if [ -f "$dir/package.json" ]; then
+              echo "Installing dependencies in $dir"
+              (cd "$dir" && npm install --omit=dev --no-audit --no-fund --legacy-peer-deps)
+            fi
+          done
+
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund ${{ inputs.legacy-peer-deps && '--legacy-peer-deps' || '' }}
         env:
