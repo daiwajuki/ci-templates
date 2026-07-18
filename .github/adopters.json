@@ -1,6 +1,6 @@
 {
   "$schema": "./adopters.schema.json",
-  "_comment": "_ci-templates 採用側リスト。notify-adopters.yml が release: published で各 repo に Issue 投稿する宛先。新規採用が増えたら uses も含めて追記する。実態とのドリフト検出は scripts/audit-ci-drift.mjs --remote で行う。最終実測: 2026-06-06 (audit-ci-drift.mjs --remote、issue #64 対応)。",
+  "_comment": "_ci-templates 採用側リスト。notify-adopters.yml が release: published で各 repo に Issue 投稿する宛先。新規採用が増えたら uses も含めて追記する。実態とのドリフト検出は scripts/audit-ci-drift.mjs --remote で行う。最終実測: 2026-07-18 (audit-ci-drift.mjs --remote、issue #69 対応)。",
   "adopters": [
     {
       "repo": "daiwajuki/Portal",
@@ -8,11 +8,11 @@
     },
     {
       "repo": "daiwajuki/ICPCostHub",
-      "uses": ["deploy-cloudrun-next", "deploy-cloudrun-laravel"]
+      "uses": ["deploy-cloudrun-next", "deploy-cloudrun-laravel", "secret-scan"]
     },
     {
       "repo": "daiwajuki/ICPEstimating",
-      "uses": ["deploy-cloudrun-next", "deploy-cloudrun-laravel"]
+      "uses": ["ci-next", "ci-laravel", "deploy-cloudrun-next", "deploy-cloudrun-laravel", "secret-scan"]
     },
     {
       "repo": "daiwajuki/PayrollManager",
@@ -46,6 +46,14 @@
     {
       "repo": "daiwajuki/daiwa-ops-app",
       "uses": ["ci-next", "deploy-cloudrun-next"]
+    },
+    {
+      "repo": "daiwajuki/Daiwajuki-DailyLogs",
+      "uses": ["deploy-cloudrun-next"]
+    },
+    {
+      "repo": "daiwajuki/builddeck",
+      "uses": ["secret-scan"]
     }
   ]
 }
