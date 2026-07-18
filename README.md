@@ -166,31 +166,36 @@ _ci-templates/
 | **B** | Portal で試験導入・deploy-cloudrun-next.yml 追加 | ✅ 完了 |
 | **C** | Dockerfile / docker-compose の copy 配布・`sync-templates.mjs` | ✅ 実装完了（Dockerfile 6 種 + compose 2 種 + sync-templates CLI、[docs/usage-sync-templates.md](docs/usage-sync-templates.md) 参照） |
 | **D** | Workload Identity Federation composite action・JSON キー廃止 | ✅ 完了（`deploy-cloudrun-*.yml` で WIF 実装済み・JSON キー回帰なし） |
-| **E** | 残り 12 プロジェクトに横展開・FastAPI / Laravel 用 CI 追加 | 🚧 進行中（6/18 採用、CI/Deploy 6 種公開済み） |
+| **E** | 残り 12 プロジェクトに横展開・FastAPI / Laravel 用 CI 追加 | 🚧 進行中（13 プロジェクトが採用済み、CI/Deploy/Scan 7 種公開済み） |
 | **F** | release-please / Renovate 配給・`audit-ci-drift.mjs` 有効化 | 🚧 進行中（release-please 完了、audit-ci-drift は [設計済み](docs/audit-ci-drift-design.md)、Renovate 配給方式は未定） |
 
-## 採用状況（最終確認: 2026-06-06、`audit-ci-drift.mjs --remote`）
+## 採用状況（最終確認: 2026-07-18、`audit-ci-drift.mjs --remote`）
 
-各プロジェクトの `.github/workflows/*.yml` に `daiwajuki/ci-templates` の `uses:` を持つかで実測（全 18 プロジェクト中 9 件採用）：
+各プロジェクトの `.github/workflows/*.yml` に `daiwajuki/ci-templates` の `uses:` を持つかで実測。`.github/adopters.json` と完全一致（drift なし、issue #69 で解消）：
 
 | プロジェクト | 状態 | 採用 workflow（reusable 名） | pin | 備考 |
 |---|---|---|---|---|
 | Portal | ✅ 採用済み | ci-next, deploy-cloudrun-next | `@v0` | Phase B（試験導入） |
-| ICPCostHub | ✅ 採用済み | deploy-cloudrun-next, deploy-cloudrun-laravel | `@v0` | Phase E（CI は別途、ci-templates 経由ではない） |
-| ICPEstimating | ✅ 採用済み | deploy-cloudrun-next, deploy-cloudrun-laravel | `@v0` | Phase E |
+| ICPCostHub | ✅ 採用済み | deploy-cloudrun-next, deploy-cloudrun-laravel, secret-scan | `@v0` | Phase E（CI は別途、ci-templates 経由ではない） |
+| ICPEstimating | ✅ 採用済み | ci-next, ci-laravel, deploy-cloudrun-next, deploy-cloudrun-laravel, secret-scan | `@v0` | Phase E |
 | PayrollManager | ✅ 採用済み | ci-next | `@v0` | Phase E |
 | BidFlow | ✅ 採用済み | ci-fastapi, deploy-cloudrun-next, deploy-cloudrun-fastapi | `@v0` | Phase E |
 | HydraulicCalculation | ✅ 採用済み | ci-next, deploy-cloudrun-next | `@v0` | Phase E |
+| ICPContacts | ✅ 採用済み | deploy-cloudrun-next | `@v0` | issue #69 drift 対応で反映（2026-07-18） |
+| ICPBlankMap | ✅ 採用済み | ci-next, deploy-cloudrun-next | `@v0` | issue #69 drift 対応で反映（2026-07-18） |
+| daiwajuki-auth（`_auth`） | ✅ 採用済み | ci-next | `@v0` | 共通認証基盤 (`@daiwajuki/auth`) 自身の CI |
 | ICPSitePhotos | ✅ 採用済み | deploy-cloudrun-next | `@v0` | issue #64 で adopters.json に追加（2026-06-06） |
 | daiwa-ops-app | ✅ 採用済み | ci-next, deploy-cloudrun-next | `@v0` | issue #64 で adopters.json に追加（2026-06-06） |
-| 残り 10 | ⏳ 未採用 | — | — | Phase E で順次横展開（BidCalc / BuildDeck / CompanyWebsite / ContractHub / DailyLogs / genba-chosa / ICPBlankMap / ICPContacts / ICPForms / Orders / StridePlan） |
+| Daiwajuki-DailyLogs | ✅ 採用済み | deploy-cloudrun-next | `@v0` | issue #69 drift 対応で adopters.json に追加（2026-07-18） |
+| builddeck | ✅ 採用済み | secret-scan | `@v0` | issue #69 drift 対応で adopters.json に追加（2026-07-18） |
+| 残り 7 | ⏳ 未採用 | — | — | Phase E で順次横展開（BidCalc / CompanyWebsite / ContractHub / genba-chosa / ICPForms / Orders / StridePlan） |
 
-確認コマンド:
+確認コマンド（GitHub 上の実態を正とする。ローカルチェックアウトの `grep` はブランチ次第でズレるため非推奨）:
 ```bash
-grep -rn 'daiwajuki/ci-templates' ../*/.github/workflows/*.yml
+node scripts/audit-ci-drift.mjs --remote
 ```
 
-> `.github/adopters.json` は [notify-adopters.yml](.github/workflows/notify-adopters.yml) の宛先正本。このテーブルと乖離させない。
+> `.github/adopters.json` は [notify-adopters.yml](.github/workflows/notify-adopters.yml) の宛先正本。このテーブルと乖離させない。乖離検出は [audit-drift.yml](.github/workflows/audit-drift.yml) が週次で自動実行し、drift 検出時は `ci-drift` ラベルの Issue に自動投稿する。
 
 ## 取り込みチェックリスト
 
