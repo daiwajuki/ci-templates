@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.2](https://github.com/daiwajuki/ci-templates/compare/v0.20.1...v0.20.2) (2026-07-18)
+
+
+### Fixed
+
+* **adopters:** drift検出分を解消しaudit-ci-driftの誤検知を修正 ([#80](https://github.com/daiwajuki/ci-templates/issues/80)) ([c8c44ee](https://github.com/daiwajuki/ci-templates/commit/c8c44ee1573c71f67d9bc2a132d8db88e94c55e6))
+
 ## [0.20.1](https://github.com/daiwajuki/ci-templates/compare/v0.20.0...v0.20.1) (2026-07-17)
 
 
