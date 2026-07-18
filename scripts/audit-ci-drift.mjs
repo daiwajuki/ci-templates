@@ -47,6 +47,7 @@ const KNOWN_WORKFLOWS = new Set([
     "deploy-cloudrun-next",
     "deploy-cloudrun-laravel",
     "deploy-cloudrun-fastapi",
+    "secret-scan",
 ]);
 
 // "uses: daiwajuki/ci-templates/.github/workflows/<name>.yml@<ref>" を拾う
