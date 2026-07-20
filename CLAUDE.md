@@ -77,7 +77,7 @@ GitHub Actions の制約。`colocate-token` は **空文字に評価される** 
 2. または PAT 値を repo-level secret に直接 fanout（CompanyWebsite / ICPSitePhotos がこのパターンで稼働中）
 3. GitHub Packages の `@daiwajuki/*` install は `github.token` + `permissions: packages: read` でフォールバック動作（reusable workflow 側で実装済み）
 
-詳細は [docs/secrets.md](docs/secrets.md) の「GitHub Free プラン制約」セクション参照。
+詳細は `daiwajuki/tools` リポ（private）の `runbooks/secrets-management.md` の「GitHub Free プラン制約」セクション参照（2026-07-20、標的型攻撃の偵察に資する運用情報を含むため非公開リポへ移設）。
 
 **採用側は `secrets: inherit` を引き続き必須**（org secret が無くなっても `GITHUB_TOKEN` の継承や将来の repo-level org-replicated secret のために必要）。過去事例: Portal CI が `secrets: inherit` 欠落で 5 連続失敗（v0.5.0 リリース時の試行錯誤期）。
 
@@ -153,7 +153,7 @@ nightly 採用集計 (`build-adoption-snapshot.mjs` の自動実行) は `daiwaj
 |---|---|---|
 | `sync-templates.mjs` | 採用側プロジェクト | GitHub raw URL から Dockerfile / compose を fetch してコピー。`.ci-templates.json` に履歴記録 |
 | `swap-deps-to-registry.mjs` | 採用側 CI（build 直前、commit しない） | `package.json` の `"@daiwajuki/X": "file:../_X"` を `"^X.Y.Z"` に書き換え。GitHub Packages から install させる |
-| `audit-secrets.mjs` | ローカル / メンテナ運用 | `gh secret list` で 14 プロジェクトの `ORG_REPO_TOKEN` / `DAIWAJUKI_APP_ID` / `DS_REPO_TOKEN`（旧、残置検知用）配備状況を Markdown 表で監査。docs/secrets.md と命名を揃えること |
+| `audit-secrets.mjs` | ローカル / メンテナ運用 | `gh secret list` で 14 プロジェクトの `ORG_REPO_TOKEN` / `DAIWAJUKI_APP_ID` / `DS_REPO_TOKEN`（旧、残置検知用）配備状況を Markdown 表で監査。`daiwajuki/tools` の `runbooks/secrets-management.md`（private）と命名を揃えること |
 | `build-adoption-snapshot.mjs` | `_tools/.github/workflows/snapshot-adoption.yml` (nightly) / ローカル | 全プロジェクトの `@daiwajuki/*` 採用バージョンを集計、Markdown + JSON 出力。`_tools/data/projects-meta.json` をワークスペース直下から読む（リポ内に sync copy がある前提） |
 | `deploy-secrets.mjs` | ローカル / メンテナ運用 | 14 プロジェクトへの secret 一括配備 (`gh secret set --org` の fanout)。`ORG_REPO_TOKEN`（org-level）/ `DAIWAJUKI_APP_ID` / `DAIWAJUKI_APP_PRIVATE_KEY`（App credentials、推奨）のローテに使う |
 | `show-legacy-peer-deps-status.mjs` | ローカル / メンテナ運用 | 各 consumer の `.npmrc` から `legacy-peer-deps=true` 残置を一覧化。Wave E（peer-deps 卒業）の exit decision 判定用 |
@@ -171,7 +171,8 @@ nightly 採用集計 (`build-adoption-snapshot.mjs` の自動実行) は `daiwaj
 | `.github/workflows/audit-drift.yml` | 週次 (Mon 0:00 JST) + workflow_dispatch で `audit-ci-drift.mjs --remote` を走らせ、drift 検出時に自リポへ Issue 投稿（既存 `ci-drift` ラベル open issue にはコメント追記）。F-6 実装。`ADOPTER_NOTIFY_TOKEN` を流用、未設定時は local fallback で degraded 動作 |
 | `.github/adopters.json` | `notify-adopters.yml` の宛先リスト。採用 repo を増減させたらここを更新する |
 | `docs/adr/` | 設計判断の Architecture Decision Records（例: 0001 = projects registry の所在） |
-| `docs/versioning.md` / `docs/secrets.md` / `docs/usage-*.md` | 採用側が引く reference。input/secret を変えたら同じ PR で更新する |
+| `docs/versioning.md` / `docs/usage-*.md` | 採用側が引く reference。input/secret を変えたら同じ PR で更新する |
+| `daiwajuki/tools` の `runbooks/secrets-management.md`（別リポ、private） | secret 管理の詳細運用（旧 `docs/secrets.md`。2026-07-20 に非公開リポへ移設） |
 
 ## ワークスペースとの関係
 

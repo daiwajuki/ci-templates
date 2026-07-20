@@ -6,7 +6,8 @@
  * repo-level secret (`DAIWAJUKI_APP_ID`, `DAIWAJUKI_APP_PRIVATE_KEY`, `DS_REPO_TOKEN`)
  * が必要箇所に配備されているか確認し、Markdown 表で出力。
  *
- * 参照: governance-plan v3 Wave A ステップ 12 / docs/secrets.md (2026-05-26 v2)
+ * 参照: governance-plan v3 Wave A ステップ 12 / daiwajuki/tools の runbooks/secrets-management.md
+ * （private リポ、旧 docs/secrets.md。2026-07-20 に非公開リポへ移設）
  *
  * Free プラン制約 (2026-05-26 発見):
  *   daiwajuki org は GitHub Free プランで、org-level secret は private repo の
@@ -35,7 +36,7 @@ const JSON_OUTPUT = process.argv.includes("--json");
 
 // 監査対象 secret 名は本体で直接参照: DAIWAJUKI_APP_ID / DAIWAJUKI_APP_PRIVATE_KEY (現行標準),
 // DS_REPO_TOKEN / ORG_REPO_TOKEN (旧、残置検知用)。命名変更時は本体の includes() 呼び出しと
-// docs/secrets.md の両方を必ず同期更新する。
+// daiwajuki/tools の runbooks/secrets-management.md（private）の両方を必ず同期更新する。
 
 function ghSecretList(target) {
     try {

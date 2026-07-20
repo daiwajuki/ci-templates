@@ -102,7 +102,7 @@ jobs:
               echo "   git push --force-with-lease"
               echo '   ```'
               echo ""
-              echo "3. 詳細は \`_ci-templates/docs/secrets.md\` を参照"
+              echo "3. 詳細は \`daiwajuki/tools\` の \`runbooks/secrets-management.md\`（private リポ）を参照"
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
