@@ -159,7 +159,7 @@ jobs:
             echo "  - vars.GCP_PROJECT_ID        (e.g., my-gcp-project)"
             echo "  - vars.GCP_REGION (optional) (e.g., asia-northeast2)"
             echo ""
-            echo "See _ci-templates/docs/secrets.md for full setup guide."
+            echo "See daiwajuki/tools runbooks/secrets-management.md (private repo) for full setup guide."
             exit 1
           fi
           if [ -z "${GCP_PROJECT_ID:-}" ]; then
