@@ -111,10 +111,10 @@ jobs:
 | `external-checkout-app-id` | 任意 | v0.7+ — GitHub App ID（推奨）。private key と組で install token を mint |
 | `external-checkout-app-private-key` | 任意 | v0.7+ — GitHub App private key (PEM)。app-id と組で必須 |
 
-## Workspace 共有 OAuth (推奨パターン)
+## Google OAuth (SaaS ごとに専用クライアント)
 
-`@daiwajuki/auth` を使う SaaS は **同じ Google OAuth Client を 19 SaaS で共有** する設計。
-Cloud Run 側は `secrets-yaml` で Secret Manager の `workspace-google-*` を参照する:
+`@daiwajuki/auth` を使う SaaS は、**それぞれ専用の Google OAuth Client を持つ**(2026-07 時点で GCP Console を実地確認したところ、全 SaaS で 1 クライアントを共有する設計は採用されておらず、Google OAuth を有効化した SaaS 15 件が例外なく専用クライアントを持っていた。過去このセクションは「共有」と説明していたが実態と異なっていたため訂正)。
+Cloud Run 側は `secrets-yaml` で Secret Manager の当該プロジェクト専用 secret を参照する:
 
 ```yaml
 jobs:
@@ -124,13 +124,14 @@ jobs:
             service-name: portal-web
             source-path: ./web
             secrets-yaml: |
-                GOOGLE_CLIENT_ID=workspace-google-client-id:latest
-                GOOGLE_CLIENT_SECRET=workspace-google-client-secret:latest
-                AUTH_SECRET=workspace-auth-secret:latest
-                MFA_ENCRYPTION_KEY=workspace-mfa-encryption-key:latest
+                GOOGLE_CLIENT_ID=portal-google-client-id:latest
+                GOOGLE_CLIENT_SECRET=portal-google-client-secret:latest
+                AUTH_SECRET=portal-auth-secret:latest
             env-vars: |
                 AUTH_URL=https://portal-web-xxxxxx.run.app
 ```
+
+(secret 名は `<project-slug>-google-client-id` 等、実プロジェクトの命名に合わせる。GitHub Actions repository secrets 方式を使う SaaS は `${{ secrets.GOOGLE_CLIENT_ID }}` 形式で参照する)
 
 Secret Manager の事前作成 / Cloud Run サービスアカウントへの read 権限付与は
 [docs/oauth-setup.md](./oauth-setup.md) を参照。
