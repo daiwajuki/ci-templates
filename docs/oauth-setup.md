@@ -5,40 +5,38 @@
 ## 前提
 
 - GCP プロジェクト: `integratedconstructionplatform`
-- Workspace 共有 OAuth Client は既に発行済 (詳細: [`_auth/docs/oauth-setup.md`](../../_auth/docs/oauth-setup.md))
+- Google OAuth Client は **SaaS ごとに専用のものを発行する**(Workspace 全体で 1 クライアントを共有する設計ではない。2026-07 時点で GCP Console を実地確認したところ、Google OAuth を有効化した SaaS 15 件が例外なく専用クライアントを持っており、共有クライアントは一度も作られていなかった。詳細: [`_auth/docs/oauth-setup.md`](../../_auth/docs/oauth-setup.md))
 - 各 SaaS は本 repo の `deploy-cloudrun-next.yml` reusable workflow を使う
 
-## Secret Manager のセットアップ (一回限り)
+## Secret Manager のセットアップ
 
-Workspace 全 SaaS で共有するため、**1 セット作るだけ**で 19 SaaS が共用可能。
+### Google OAuth Client ID / Secret (SaaS ごとに毎回)
 
 ```bash
-# === Workspace 共有 secret 4 つを Secret Manager に作成 ===
+SLUG=<newsaas>   # 例: daiwa-ops-app (そのSaaSの他secretの命名に合わせる)
 
-# 1. Google OAuth Client ID
-echo -n "1234567890-xxxxx.apps.googleusercontent.com" | \
-    gcloud secrets create workspace-google-client-id \
+echo -n "<発行された client id>" | \
+    gcloud secrets create ${SLUG}-google-client-id \
         --replication-policy=automatic \
         --data-file=- \
         --project=integratedconstructionplatform
 
-# 2. Google OAuth Client Secret
-echo -n "GOCSPX-xxxxx" | \
-    gcloud secrets create workspace-google-client-secret \
+echo -n "<発行された client secret>" | \
+    gcloud secrets create ${SLUG}-google-client-secret \
         --replication-policy=automatic \
         --data-file=- \
         --project=integratedconstructionplatform
+```
 
-# 3. AUTH_SECRET (Auth.js v5 の JWT 暗号鍵)
+GitHub Actions repository secrets を使う場合(PayrollManager・CompanyWebsite が採用しているパターン)は、上記の代わりに該当リポジトリの Settings > Secrets に `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` を登録し、デプロイ workflow 側で `${{ secrets.GOOGLE_CLIENT_ID }}` 形式で参照する。
+
+### AUTH_SECRET / MFA_ENCRYPTION_KEY
+
+Google OAuth クライアントとは別軸の設計(本ドキュメントの今回の改訂では変更していない)。既存プロジェクトの命名慣習(`<project>-auth-secret` 等、Secret Manager 上の既存エントリを `gcloud secrets list` で確認)に合わせて作成する:
+
+```bash
 openssl rand -base64 32 | \
-    gcloud secrets create workspace-auth-secret \
-        --replication-policy=automatic \
-        --data-file=- \
-        --project=integratedconstructionplatform
-
-# 4. MFA_ENCRYPTION_KEY (TOTP secret encryption-at-rest 用 AES-256-GCM 鍵)
-openssl rand -base64 32 | \
-    gcloud secrets create workspace-mfa-encryption-key \
+    gcloud secrets create <project>-auth-secret \
         --replication-policy=automatic \
         --data-file=- \
         --project=integratedconstructionplatform
@@ -46,22 +44,20 @@ openssl rand -base64 32 | \
 
 ## Cloud Run サービスアカウントに read 権限付与
 
-各 SaaS の Cloud Run runner サービスアカウント (例: `portal-runner@<project>.iam.gserviceaccount.com`)
-に Secret Manager の secretAccessor ロールを付与:
+各 SaaS の Cloud Run runner サービスアカウントに、そのプロジェクト自身の secret 群への secretAccessor ロールを付与する:
 
 ```bash
-SECRETS=("workspace-google-client-id" "workspace-google-client-secret" "workspace-auth-secret" "workspace-mfa-encryption-key")
-SA="portal-runner@integratedconstructionplatform.iam.gserviceaccount.com"
+PROJECT=integratedconstructionplatform
+SLUG=<newsaas>
+SA="<該当SaaSのrunner SA>@${PROJECT}.iam.gserviceaccount.com"
 
-for s in "${SECRETS[@]}"; do
+for s in "${SLUG}-google-client-id" "${SLUG}-google-client-secret" "${SLUG}-auth-secret"; do
     gcloud secrets add-iam-policy-binding "$s" \
         --member="serviceAccount:$SA" \
         --role="roles/secretmanager.secretAccessor" \
-        --project=integratedconstructionplatform
+        --project=$PROJECT
 done
 ```
-
-新規 SaaS 追加時はその SaaS の runner SA を同じ secret 群に追加するだけ。
 
 ## デプロイ workflow での参照
 
@@ -76,30 +72,35 @@ jobs:
     deploy:
         uses: daiwajuki/ci-templates/.github/workflows/deploy-cloudrun-next.yml@v0
         with:
-            service-name: portal-web
+            service-name: <service>
             source-path: ./web
             secrets-yaml: |
-                GOOGLE_CLIENT_ID=workspace-google-client-id:latest
-                GOOGLE_CLIENT_SECRET=workspace-google-client-secret:latest
-                AUTH_SECRET=workspace-auth-secret:latest
-                MFA_ENCRYPTION_KEY=workspace-mfa-encryption-key:latest
+                GOOGLE_CLIENT_ID=<slug>-google-client-id:latest
+                GOOGLE_CLIENT_SECRET=<slug>-google-client-secret:latest
+                AUTH_SECRET=<slug>-auth-secret:latest
             env-vars: |
-                AUTH_URL=https://portal-web-xxxxxx.run.app
+                AUTH_URL=https://<your-cloud-run-url>
         secrets: inherit
 ```
 
+(secret 名は実プロジェクトの既存命名に合わせること。GitHub Actions secrets 方式の場合は `${{ secrets.GOOGLE_CLIENT_ID }}` 形式で参照)
+
 ## OAuth Client へのリダイレクト URI 追加 (新規 SaaS 時)
 
-新規 SaaS の Cloud Run URL が決まったら、その URL を OAuth Client の Authorized redirect URIs に追加:
+新規 SaaS の Cloud Run URL が決まったら、その URL を**そのSaaS専用の** OAuth Client の Authorized redirect URIs に追加:
 
 ```bash
 # 単一プロジェクトの URI を出力
 node _tools/cli/manage-oauth.mjs --list-required-uris --project=<NewSaaS> --kind=both --copy
 
-# → GCP Console > Credentials > 該当 OAuth Client > ADD URI で貼り付け
+# → GCP Console > Credentials > <NewSaaS> 専用の OAuth Client > ADD URI で貼り付け
 ```
 
 ## ローテーション
+
+### Google OAuth Client Secret
+
+GCP Console > Credentials > **該当 SaaS 専用**の Client > 「ADD SECRET」で新規発行 → そのSaaSの `<slug>-google-client-secret` に新規 version 追加 → 次デプロイで自動切替 → 旧 secret を Web Console から削除。他 SaaS には影響しない(専用クライアントのため)。
 
 ### AUTH_SECRET / MFA_ENCRYPTION_KEY
 
@@ -107,28 +108,23 @@ GCP Secret Manager の version を追加 → `:latest` 参照なので次デプ�
 
 ```bash
 openssl rand -base64 32 | \
-    gcloud secrets versions add workspace-auth-secret --data-file=-
+    gcloud secrets versions add <project>-auth-secret --data-file=-
 ```
 
 - **AUTH_SECRET**: 7 日並行運用窓口を設けてから旧 version を destroy
 - **MFA_ENCRYPTION_KEY**: 鍵を変えると既存 TOTP secret が復号不能になるため、別運用が必要 (`_auth/scripts/migrate-encrypt-mfa-secrets.mjs` の re-encrypt モードを追加実装する必要あり)
-
-### Google OAuth Client Secret
-
-GCP Console > Credentials > 該当 Client > 「ADD SECRET」で新規発行 → `workspace-google-client-secret` の新規 version 追加 → 全 SaaS 次デプロイで自動切替 → 旧 secret を Web Console から削除。
 
 ## トラブルシューティング
 
 | 症状 | 原因 | 対処 |
 |---|---|---|
 | Cloud Run 起動時 `Failed to access secret` | runner SA に secretAccessor 未付与 | 上記 IAM bind コマンドで該当 SA を追加 |
-| Auth.js v5 `MissingSecret` | `AUTH_SECRET` 注入されていない | `secrets-yaml` に `AUTH_SECRET=workspace-auth-secret:latest` を追加 |
-| Google ログイン後 `redirect_uri_mismatch` | OAuth Client に Cloud Run URL が登録されていない | `manage-oauth.mjs --project=<Name> --kind=both --copy` → Web Console に貼付 |
-| Workspace 内の別 SaaS で同 secret を参照したい | 既に共有設計なので OK | 該当 SaaS の runner SA を IAM bind するだけ |
+| Auth.js v5 `MissingSecret` | `AUTH_SECRET` 注入されていない | `secrets-yaml` に該当プロジェクトの `*-auth-secret:latest` を追加 |
+| Google ログイン後 `redirect_uri_mismatch` | **そのSaaS専用**の OAuth Client に Cloud Run URL が登録されていない(共有クライアントは存在しないため、他 SaaS のクライアントに URI を足しても効果はない) | `manage-oauth.mjs --project=<Name> --kind=both --copy` → 該当 SaaS 専用クライアントの Web Console に貼付 |
 
 ## 関連
 
-- [`usage-deploy-next.md`](./usage-deploy-next.md) — deploy-cloudrun-next.yml 全体ガイド (Workspace 共有 OAuth セクション含む)
+- [`usage-deploy-next.md`](./usage-deploy-next.md) — deploy-cloudrun-next.yml 全体ガイド
 - [`_auth/docs/oauth-setup.md`](../../_auth/docs/oauth-setup.md) — ローカル開発側のセットアップ
-- [`_auth/scripts/seed-env.mjs`](../../_auth/scripts/seed-env.mjs) — `.env.local` 配給スクリプト
+- [`_auth/scripts/seed-env.mjs`](../../_auth/scripts/seed-env.mjs) — `.env.local` 配給スクリプト (AUTH_SECRET / AUTH_URL / MFA_ENCRYPTION_KEY のみ。Google OAuth は対象外)
 - [`_tools/cli/manage-oauth.mjs`](../../_tools/cli/manage-oauth.mjs) — URI 列挙 CLI
