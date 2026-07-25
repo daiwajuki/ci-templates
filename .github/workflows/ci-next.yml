@@ -40,6 +40,15 @@ on:
         description: npm audit --audit-level に渡す最小重要度
         type: string
         default: 'high'
+      audit-omit-dev:
+        description: |
+          npm audit に --omit=dev を付与し、本番依存のみをゲート対象にするか。
+          devDependencies（lint/test 系ツールチェーン）の脆弱性は成果物に同梱されない一方、
+          上流が追従するまで非破壊の修正手段が無く、全 PR がブロックされ続けることがある。
+          その場合に本番依存の防御を保ったままブロックを解くための opt-in。
+          既定は false（従来どおり dev 込みで監査する）。
+        type: boolean
+        default: false
       legacy-peer-deps:
         description: |
           npm ci に --legacy-peer-deps を付与するか。
@@ -249,7 +258,7 @@ jobs:
 
       - name: Audit
         if: inputs.run-audit
-        run: npm audit --audit-level="${{ inputs.audit-level }}"
+        run: npm audit --audit-level="${{ inputs.audit-level }}" ${{ inputs.audit-omit-dev && '--omit=dev' || '' }}
 
       - name: Copy env file for build
         if: inputs.run-build && inputs.build-env-file != ''

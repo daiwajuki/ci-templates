@@ -27,6 +27,7 @@ jobs:
 | `run-test` | boolean | `false`（opt-in） | `npm test` を実行するか |
 | `run-audit` | boolean | `false`（opt-in） | `npm audit` を実行するか |
 | `audit-level` | string | `'high'` | `npm audit --audit-level` に渡す最小重要度 |
+| `audit-omit-dev` | boolean | `false` | `npm audit` に `--omit=dev` を付与し、本番依存のみをゲート対象にする。devDependencies（lint/test 系ツールチェーン）の脆弱性に上流の非破壊修正が無く全 PR がブロックされ続ける場合の逃げ道。本番依存の防御は維持される |
 | `legacy-peer-deps` | boolean | `false` | `npm ci` に `--legacy-peer-deps` を付与するか（Next.js メジャーバージョン先取り等で peer dependency が ERESOLVE になる consumer 向け） |
 | `build-env-file` | string | `''` | ビルド時に `.env.local` としてコピーする env ファイルのパス |
 | `build-env` | string | `''` | ビルド時に `.env.local` に追記する KEY=VALUE 複数行（`build-env-file` の後に追記） |
