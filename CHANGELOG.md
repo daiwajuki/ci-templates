@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.21.0](https://github.com/daiwajuki/ci-templates/compare/v0.20.2...v0.21.0) (2026-07-25)
+
+
+### Added
+
+* **ci-next:** npm audit を本番依存のみに絞る audit-omit-dev を追加する ([#86](https://github.com/daiwajuki/ci-templates/issues/86)) ([1ccce86](https://github.com/daiwajuki/ci-templates/commit/1ccce86a60ad9ccc0a1bf4933820017237aff1fc))
+
+
+### Fixed
+
+* **secrets:** docs/secrets.md を非公開リポジトリへ移設し参照を修正 ([#84](https://github.com/daiwajuki/ci-templates/issues/84)) ([71c0d99](https://github.com/daiwajuki/ci-templates/commit/71c0d99da7166ecd902e23a528132e9e99395920))
+
 ## [0.20.2](https://github.com/daiwajuki/ci-templates/compare/v0.20.1...v0.20.2) (2026-07-18)
 
 
