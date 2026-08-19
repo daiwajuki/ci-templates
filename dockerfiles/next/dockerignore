@@ -1,0 +1,30 @@
+# Next.js 用 .dockerignore テンプレート（sync-templates が .dockerignore として配置）
+#
+# standalone マルチステージビルドでは最終イメージに .next/standalone 等の
+# ビルド成果物しか入らないため、Laravel ほど致命的ではない。
+# ただし以下の理由で必要:
+#
+# 1) ビルドコンテキストの転送量削減（node_modules / .next を送らない）
+# 2) builder ステージには .env.local が入るため、ビルドログや中間レイヤーに
+#    秘密情報が残りうる。ランタイム値は Cloud Run の env / secrets で注入する方針。
+# 3) monorepo で build-context をリポルートにしている場合、api/.env 等
+#    別スタックの秘密情報まで巻き込むため除外が必要。
+#
+# ※ build-context をリポルートにしている場合は、このファイルを
+#   next-app/ ではなく**リポルート**に置くこと（docker は build-context 直下の
+#   .dockerignore しか読まない）。その場合はパスに接頭辞が必要:
+#     next-app/.env
+#     api/.env
+
+# --- 秘密情報 ---
+.env
+.env.*
+!.env.example
+
+# --- ビルドで再生成されるもの ---
+node_modules
+.next
+
+# --- イメージに不要 ---
+.git
+.github
