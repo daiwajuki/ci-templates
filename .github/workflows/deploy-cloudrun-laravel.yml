@@ -292,6 +292,7 @@ jobs:
           secrets: ${{ inputs.secrets-yaml }}
 
       - name: Route 100% traffic to latest Ready revision
+        id: traffic
         if: inputs.route-to-latest
         run: |
           # set -e: gcloud / update-traffic 失敗で即 fail。
@@ -335,6 +336,7 @@ jobs:
           gcloud run services update-traffic "${{ inputs.service-name }}" \
             --region="${{ steps.region.outputs.value }}" \
             --to-revisions="${LATEST_READY}=100"
+          echo "pinned_revision=${LATEST_READY}" >> "$GITHUB_OUTPUT"
 
       # ─── スモークテスト ──────────────────────────────────────────────────
       - name: Mint OIDC ID token for smoke test
@@ -499,5 +501,15 @@ jobs:
             echo "| Status | ${{ job.status }} |"
             if [ -n "${{ inputs.sync-job-names }}" ]; then
               echo "| Synced jobs | \`${{ steps.syncjobs.outputs.synced }}\` |"
+            fi
+            if [ -n "${{ steps.traffic.outputs.pinned_revision }}" ]; then
+              echo "| Traffic | 100% → \`${{ steps.traffic.outputs.pinned_revision }}\` (リビジョン名で固定) |"
+              echo ""
+              echo "> ⚠️ トラフィックは上記リビジョンに**固定**されています"
+              echo "> （Ready=False のリビジョンへ流れる事故を防ぐため \`--to-latest\` ではなく明示指定）。"
+              echo "> そのため \`gcloud run services update\` でシークレットや環境変数を変更しても、"
+              echo "> 新リビジョンは作られるが**トラフィックは向かず反映されません**。"
+              echo "> 反映するにはデプロイを再実行するか、"
+              echo "> \`gcloud run services update-traffic <service> --region <region> --to-latest\` を併用してください。"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
