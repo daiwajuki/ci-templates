@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.22.0](https://github.com/daiwajuki/ci-templates/compare/v0.21.0...v0.22.0) (2026-08-19)
+
+
+### Added
+
+* **deploy-laravel:** cloudsql-instances 入力を追加し next 版とパリティを取る ([#91](https://github.com/daiwajuki/ci-templates/issues/91)) ([297f171](https://github.com/daiwajuki/ci-templates/commit/297f171a90259b9a83b19768e5e10314036ef561)), closes [#90](https://github.com/daiwajuki/ci-templates/issues/90)
+* **dockerfiles:** .dockerignore テンプレートを追加し Dockerfile とセットで配布する ([#93](https://github.com/daiwajuki/ci-templates/issues/93)) ([f2e6bb7](https://github.com/daiwajuki/ci-templates/commit/f2e6bb7ac1918865b48b3c729ce5bda360de31c8)), closes [#89](https://github.com/daiwajuki/ci-templates/issues/89)
+
+
+### Fixed
+
+* **deploy:** トラフィック固定先を Job Summary に出力し out-of-band 更新の落とし穴を明示 ([#92](https://github.com/daiwajuki/ci-templates/issues/92)) ([5d7d9cb](https://github.com/daiwajuki/ci-templates/commit/5d7d9cba745f945314adea8bbc4b717708c15bc2)), closes [#88](https://github.com/daiwajuki/ci-templates/issues/88)
+
 ## [0.21.0](https://github.com/daiwajuki/ci-templates/compare/v0.20.2...v0.21.0) (2026-07-25)
 
 
