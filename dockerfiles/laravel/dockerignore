@@ -1,0 +1,39 @@
+# Laravel 用 .dockerignore テンプレート（sync-templates が .dockerignore として配置）
+#
+# ⚠️ これが無いと本番イメージが壊れる／秘密情報が漏れる。
+# Laravel の Dockerfile は最終ステージで `COPY . .` するため、ビルドコンテキストの
+# 中身がそのままイメージへ入る。
+#
+# 1) ローカルの .env が焼き込まれると、Cloud Run の env / secrets より優先されて
+#    本番が開発用設定で動く（DB 接続先が sqlite にフォールバックする等）。
+#    実例: daiwajuki/Orders (2026-08-15) — DB_CONNECTION=pgsql を注入していたのに
+#    イメージ内 .env が勝ち、/api/health/db が sqlite を探して 503。
+#    さらに実 DB パスワードと APP_KEY がイメージに同梱されていた。
+#
+# 2) ローカルで `composer install`（dev 込み）した bootstrap/cache/*.php が入ると、
+#    --no-dev ビルドに存在しない dev パッケージを参照して
+#    `php artisan route:cache` が Class not found で失敗する。
+
+# --- 秘密情報（最重要）---
+.env
+.env.*
+!.env.example
+
+# --- dev 依存で生成されたパッケージ発見キャッシュ ---
+bootstrap/cache/*.php
+
+# --- ビルドで再生成されるもの ---
+vendor
+node_modules
+
+# --- ランタイム生成物 ---
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+
+# --- イメージに不要 ---
+.git
+.github
+tests
+.phpunit.result.cache

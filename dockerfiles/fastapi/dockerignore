@@ -1,0 +1,27 @@
+# FastAPI 用 .dockerignore テンプレート（sync-templates が .dockerignore として配置）
+#
+# Python の Dockerfile も最終ステージでソースツリーを COPY するため、
+# ローカルの .env がイメージへ焼き込まれると本番の env / secrets より
+# 優先されうる（python-dotenv 等の読み込み順に依存）。
+
+# --- 秘密情報 ---
+.env
+.env.*
+!.env.example
+*.pem
+*-key.json
+service-account*.json
+
+# --- ビルド／実行で再生成されるもの ---
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# --- イメージに不要 ---
+.git
+.github
+tests

@@ -31,6 +31,16 @@ const REPO = 'daiwajuki/ci-templates';
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}`;
 const MANIFEST = '.ci-templates.json';
 
+/**
+ * 出力パスは常に POSIX 区切りで組み立てる（Windows で path.join すると
+ * `api\.dockerignore` になり、manifest の target 表記が OS 依存になるため）。
+ * ディレクトリ部が無い場合は接頭辞なしで返す。
+ */
+function joinPosix(dir, base) {
+  const d = dir.replace(/\\/g, '/');
+  return !d || d === '.' ? base : `${d.replace(/\/$/, '')}/${base}`;
+}
+
 const args = parseArgs(process.argv.slice(2));
 
 if (args.help) {
@@ -97,6 +107,17 @@ function resolveTasks(args) {
       kind: 'dockerfile',
       source: `dockerfiles/${stack}/Dockerfile.${variant}`,
       output: args.output ?? 'Dockerfile',
+      version,
+    });
+    // Dockerfile と .dockerignore は必ずセットで配る。
+    // .dockerignore が無いと Laravel/FastAPI ではローカルの .env がイメージへ
+    // 焼き込まれ、Cloud Run の env / secrets より優先されて本番が壊れる
+    // (daiwajuki/Orders 2026-08-15)。--output でパスを変えた場合は
+    // その隣に .dockerignore を置く。
+    tasks.push({
+      kind: 'dockerignore',
+      source: `dockerfiles/${stack}/dockerignore`,
+      output: joinPosix(dirname(args.output ?? 'Dockerfile'), '.dockerignore'),
       version,
     });
   }
