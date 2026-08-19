@@ -212,6 +212,7 @@ node scripts/audit-ci-drift.mjs --remote
 | Volta セットアップで Node が違う | `package.json` の `volta.node` 未設定 | `volta pin node@20 npm@10` を実行 |
 | `secrets.X` が読めない | reusable workflow への secrets inherit 漏れ | 呼び出し側に `secrets: inherit` を追加 |
 | MAJOR 更新でジョブ落ち | 入力 API 破壊変更 | `CHANGELOG.md` 確認、tag を `@v0` から `@v1` に上げる前に self-test 通す |
+| `gcloud run services update` でシークレット/環境変数を変えても反映されない | deploy 時にトラフィックをリビジョン名で固定しているため（`--to-latest` は Ready=False のリビジョンへ流れる事故があり不採用） | 新リビジョンは作られるがトラフィックが向かない。デプロイを再実行するか `gcloud run services update-traffic <service> --region <region> --to-latest` を併用する。現在の固定先は Job Summary の Traffic 行に出力される |
 
 ## 関連基盤
 
