@@ -51,6 +51,30 @@ jobs:
 | `route-to-latest` | boolean | `true` | 成功時に latest へ 100% トラフィック |
 | `timeout-minutes` | number | `25` | ジョブタイムアウト |
 | `additional-build-context-repos` | string | `''` | v0.7+ — BuildKit additional contexts に渡す追加 repo（改行区切り `name=owner/repo[@ref]`）|
+| `cloudsql-instances` | string | `''` | 接続する Cloud SQL インスタンスの接続名（カンマ区切り）。指定時に `--add-cloudsql-instances` を付与し unix socket `/cloudsql/<conn>` を有効化。ランタイム SA に `roles/cloudsql.client` が必要。例: `proj:asia-northeast1:contacts` |
+
+## Cloud SQL 接続（unix socket）
+
+Cloud SQL に接続するアプリは `cloudsql-instances` に接続名を指定する。`--add-cloudsql-instances` が付与され、コンテナ内 `/cloudsql/<connection-name>` の unix socket が有効になる：
+
+```yaml
+jobs:
+  deploy:
+    uses: daiwajuki/ci-templates/.github/workflows/deploy-cloudrun-fastapi.yml@v0
+    with:
+      service-name: bidflow-api
+      source-path: ./server-py
+      ar-repo: bidflow
+      image-name: api
+      cloudsql-instances: integratedconstructionplatform:asia-northeast1:contacts
+      secrets-yaml: |
+        DATABASE_URL=bidflow-database-url:latest
+      # DATABASE_URL は postgresql+asyncpg://USER:PW@/DB?host=/cloudsql/<connection-name> 形式
+```
+
+> デプロイ後に `gcloud run services update --add-cloudsql-instances` を手で打つ運用は避けること。
+> このテンプレートはトラフィックを**リビジョン名で固定**するため、新リビジョンは作られても
+> トラフィックが向かず反映されない。必ずこの input 経由で指定する。
 
 ## イメージタグの命名
 

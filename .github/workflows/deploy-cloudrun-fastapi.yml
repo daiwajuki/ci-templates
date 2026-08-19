@@ -80,6 +80,15 @@ on:
           private repo を含む場合は external-checkout-app-* もしくは external-checkout-token secret も必要。
         type: string
         default: ''
+      cloudsql-instances:
+        description: |
+          Cloud Run に接続する Cloud SQL インスタンスの接続名（カンマ区切り）。
+          指定すると deploy 時に `--add-cloudsql-instances=<value>` を付与し、
+          コンテナ内の unix socket `/cloudsql/<connection-name>` を有効化する。
+          例: my-project:asia-northeast1:contacts
+          ※ ランタイム SA に roles/cloudsql.client が必要。空なら付与しない（後方互換）。
+        type: string
+        default: ''
     secrets:
       external-checkout-token:
         description: |
@@ -254,13 +263,14 @@ jobs:
       # Cloud Run のリソースフラグ (--cpu / --memory / --concurrency / --timeout) を
       # 指定された入力だけ組み立てる。未指定の項目は付与せず既存リビジョンの設定を継承する
       # (deploy-cloudrun は --image のみ指定時に現行設定を引き継ぐため、後方互換)。
-      - name: Compute Cloud Run resource flags
+      - name: Compute Cloud Run deploy flags
         id: resource-flags
         env:
           CPU: ${{ inputs.cpu }}
           MEMORY: ${{ inputs.memory }}
           CONCURRENCY: ${{ inputs.concurrency }}
           CR_TIMEOUT: ${{ inputs.cloudrun-timeout }}
+          CLOUDSQL: ${{ inputs.cloudsql-instances }}
         run: |
           set -euo pipefail
           flags=""
@@ -268,9 +278,11 @@ jobs:
           if [ -n "$MEMORY" ]; then flags="$flags --memory=$MEMORY"; fi
           if [ -n "$CONCURRENCY" ]; then flags="$flags --concurrency=$CONCURRENCY"; fi
           if [ -n "$CR_TIMEOUT" ]; then flags="$flags --timeout=$CR_TIMEOUT"; fi
+          # Cloud SQL 接続。laravel / next 版とパリティを取る (#95)。
+          if [ -n "$CLOUDSQL" ]; then flags="$flags --add-cloudsql-instances=$CLOUDSQL"; fi
           flags="$(echo "$flags" | xargs || true)"  # 前後空白 trim
           echo "value=$flags" >> "$GITHUB_OUTPUT"
-          echo "Cloud Run resource flags: ${flags:-<none, inherit existing>}"
+          echo "Cloud Run deploy flags: ${flags:-<none, inherit existing>}"
 
       - name: Deploy to Cloud Run
         id: deploy
