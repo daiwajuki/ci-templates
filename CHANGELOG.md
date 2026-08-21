@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.0](https://github.com/daiwajuki/ci-templates/compare/v0.22.0...v0.23.0) (2026-08-19)
+
+
+### Added
+
+* **deploy-fastapi:** cloudsql-instances 入力を追加し laravel/next とパリティを取る ([#96](https://github.com/daiwajuki/ci-templates/issues/96)) ([6b8c22f](https://github.com/daiwajuki/ci-templates/commit/6b8c22f1b768d169bf6e0768f0ac0a2871b7fe8f))
+
 ## [0.22.0](https://github.com/daiwajuki/ci-templates/compare/v0.21.0...v0.22.0) (2026-08-19)
 
 
