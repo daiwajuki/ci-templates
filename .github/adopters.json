@@ -49,11 +49,15 @@
     },
     {
       "repo": "daiwajuki/Daiwajuki-DailyLogs",
-      "uses": ["deploy-cloudrun-next"]
+      "uses": ["ci-next", "deploy-cloudrun-next"]
     },
     {
       "repo": "daiwajuki/builddeck",
       "uses": ["secret-scan"]
+    },
+    {
+      "repo": "daiwajuki/Orders",
+      "uses": ["ci-next", "deploy-cloudrun-laravel", "deploy-cloudrun-next"]
     }
   ]
 }

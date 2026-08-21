@@ -169,7 +169,7 @@ _ci-templates/
 | **E** | 残り 12 プロジェクトに横展開・FastAPI / Laravel 用 CI 追加 | 🚧 進行中（13 プロジェクトが採用済み、CI/Deploy/Scan 7 種公開済み） |
 | **F** | release-please / Renovate 配給・`audit-ci-drift.mjs` 有効化 | 🚧 進行中（release-please 完了、audit-ci-drift は [設計済み](docs/audit-ci-drift-design.md)、Renovate 配給方式は未定） |
 
-## 採用状況（最終確認: 2026-07-18、`audit-ci-drift.mjs --remote`）
+## 採用状況（最終確認: 2026-08-22、`audit-ci-drift.mjs --remote`）
 
 各プロジェクトの `.github/workflows/*.yml` に `daiwajuki/ci-templates` の `uses:` を持つかで実測。`.github/adopters.json` と完全一致（drift なし、issue #69 で解消）：
 
@@ -186,9 +186,10 @@ _ci-templates/
 | daiwajuki-auth（`_auth`） | ✅ 採用済み | ci-next | `@v0` | 共通認証基盤 (`@daiwajuki/auth`) 自身の CI |
 | ICPSitePhotos | ✅ 採用済み | deploy-cloudrun-next | `@v0` | issue #64 で adopters.json に追加（2026-06-06） |
 | daiwa-ops-app | ✅ 採用済み | ci-next, deploy-cloudrun-next | `@v0` | issue #64 で adopters.json に追加（2026-06-06） |
-| Daiwajuki-DailyLogs | ✅ 採用済み | deploy-cloudrun-next | `@v0` | issue #69 drift 対応で adopters.json に追加（2026-07-18） |
+| Daiwajuki-DailyLogs | ✅ 採用済み | ci-next, deploy-cloudrun-next | `@v0` | issue #87 drift 対応で `ci-next` を追加反映（2026-08-22） |
 | builddeck | ✅ 採用済み | secret-scan | `@v0` | issue #69 drift 対応で adopters.json に追加（2026-07-18） |
-| 残り 7 | ⏳ 未採用 | — | — | Phase E で順次横展開（BidCalc / CompanyWebsite / ContractHub / genba-chosa / ICPForms / Orders / StridePlan） |
+| Orders | ✅ 採用済み | ci-next, deploy-cloudrun-laravel, deploy-cloudrun-next | `@v0` | issue #87 drift 対応で adopters.json に追加（2026-08-22） |
+| 残り 6 | ⏳ 未採用 | — | — | Phase E で順次横展開（BidCalc / CompanyWebsite / ContractHub / genba-chosa / ICPForms / StridePlan） |
 
 確認コマンド（GitHub 上の実態を正とする。ローカルチェックアウトの `grep` はブランチ次第でズレるため非推奨）:
 ```bash
