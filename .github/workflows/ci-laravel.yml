@@ -39,6 +39,29 @@ on:
         description: composer 依存をキャッシュするか
         type: boolean
         default: true
+      run-postgres-tests:
+        description: >-
+          PostgreSQL 依存の Feature テスト（UsesDevPostgres 系トレイトが dev DB 接続を要求する
+          テスト）を、専用の postgres サービスコンテナ付きジョブで実行するか。既定は無効
+          （既存の `ci` ジョブは postgres 無しで完結する軽量ジョブのまま変えない）。
+          有効化した consumer 側の phpunit.xml が期待する env（PG_TEST_HOST=127.0.0.1 /
+          PG_TEST_PORT=<postgres-port> / PG_TEST_USERNAME=postgres / PG_TEST_PASSWORD=postgres /
+          PG_TEST_DATABASE=<postgres-database>）に合わせて DB を作成し `php artisan migrate --force`
+          してから `php artisan test` を実行する。
+        type: boolean
+        default: false
+      postgres-database:
+        description: run-postgres-tests 有効時に作成する DB 名（consumer の phpunit.xml の PG_TEST_DATABASE と一致させること）
+        type: string
+        default: 'testing'
+      postgres-port:
+        description: run-postgres-tests 有効時にホストへ公開するポート（consumer の PG_TEST_PORT 既定値=5439 と一致させること）
+        type: string
+        default: '5439'
+      postgres-test-args:
+        description: 'postgres-tests ジョブの php artisan test に渡す追加引数（既定は test-args と同じ）'
+        type: string
+        default: ''
 
 # Node.js 24 を先取り opt-in (2026-06-02 で強制移行、それ以前に互換性を検証する)。
 # 参考: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
@@ -103,3 +126,94 @@ jobs:
       - name: Run tests
         if: inputs.run-tests
         run: php artisan test ${{ inputs.test-args }}
+
+  postgres-tests:
+    name: Feature Tests (PostgreSQL)
+    if: inputs.run-postgres-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    services:
+      postgres:
+        image: postgres:14-alpine
+        env:
+          POSTGRES_DB: ${{ inputs.postgres-database }}
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - ${{ inputs.postgres-port }}:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+          extensions: ${{ inputs.php-extensions }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Get composer cache directory
+        if: inputs.cache-composer
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache composer dependencies
+        if: inputs.cache-composer
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ inputs.php-version }}-${{ hashFiles(format('{0}/composer.lock', inputs.working-directory)) }}
+          restore-keys: |
+            ${{ runner.os }}-composer-${{ inputs.php-version }}-
+
+      - name: Install dependencies
+        run: composer install ${{ inputs.composer-args }}
+
+      - name: Prepare environment
+        if: inputs.env-from-example
+        run: |
+          if [ -f .env.example ] && [ ! -f .env ]; then
+            cp .env.example .env
+          fi
+          if [ -f .env ]; then
+            php artisan key:generate --force
+          fi
+
+      # UsesDevPostgres 系トレイト（tests/Concerns/UsesDevPostgres.php）の既定値に合わせる。
+      # consumer の phpunit.xml が PG_TEST_* を上書きしている場合はそちらが優先される
+      # （migrate はこのジョブの env、テスト実行は phpunit.xml の env で行われる点に注意し、
+      #  postgres-database / postgres-port を consumer の phpunit.xml と一致させること）。
+      - name: Run migrations against dev PostgreSQL
+        env:
+          PG_TEST_HOST: 127.0.0.1
+          PG_TEST_PORT: ${{ inputs.postgres-port }}
+          PG_TEST_DATABASE: ${{ inputs.postgres-database }}
+          PG_TEST_USERNAME: postgres
+          PG_TEST_PASSWORD: postgres
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: ${{ inputs.postgres-port }}
+          DB_DATABASE: ${{ inputs.postgres-database }}
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+        run: php artisan migrate --force
+
+      - name: Run tests (PostgreSQL 依存を含む)
+        env:
+          PG_TEST_HOST: 127.0.0.1
+          PG_TEST_PORT: ${{ inputs.postgres-port }}
+          PG_TEST_DATABASE: ${{ inputs.postgres-database }}
+          PG_TEST_USERNAME: postgres
+          PG_TEST_PASSWORD: postgres
+        run: php artisan test ${{ inputs.postgres-test-args || inputs.test-args }}
