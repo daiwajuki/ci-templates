@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.24.0](https://github.com/daiwajuki/ci-templates/compare/v0.23.0...v0.24.0) (2026-09-04)
+
+
+### Added
+
+* **ci-laravel:** postgres-tests ジョブを追加し UsesDevPostgres 系 Feature テストをゲート化できるようにする ([#100](https://github.com/daiwajuki/ci-templates/issues/100)) ([9bb8213](https://github.com/daiwajuki/ci-templates/commit/9bb82132141dd3e42ffe743d2a8912f30c176ce0))
+
+
+### Fixed
+
+* adopters.json のドリフトを解消（Daiwajuki-DailyLogs / Orders） ([#98](https://github.com/daiwajuki/ci-templates/issues/98)) ([de6dcb1](https://github.com/daiwajuki/ci-templates/commit/de6dcb17cb524993ad256d0569e397f953d10164))
+* **ci-next:** npm audit をレジストリの audit エンドポイント障害でリトライし、脆弱性検出と区別する ([#102](https://github.com/daiwajuki/ci-templates/issues/102)) ([c8b69a3](https://github.com/daiwajuki/ci-templates/commit/c8b69a3fa3e3be025d0eb97f82be948b1b1acff0))
+
 ## [0.23.0](https://github.com/daiwajuki/ci-templates/compare/v0.22.0...v0.23.0) (2026-08-19)
 
 
