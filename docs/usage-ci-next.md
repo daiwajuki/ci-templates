@@ -28,6 +28,7 @@ jobs:
 | `run-audit` | boolean | `false`（opt-in） | `npm audit` を実行するか |
 | `audit-level` | string | `'high'` | `npm audit --audit-level` に渡す最小重要度 |
 | `audit-omit-dev` | boolean | `false` | `npm audit` に `--omit=dev` を付与し、本番依存のみをゲート対象にする。devDependencies（lint/test 系ツールチェーン）の脆弱性に上流の非破壊修正が無く全 PR がブロックされ続ける場合の逃げ道。本番依存の防御は維持される |
+| `audit-fail-on-registry-error` | boolean | `false` | `npm audit` がレジストリの audit エンドポイント障害で落ちたときにジョブを失敗させるか。既定は 3 回リトライ後に warning を出して監査をスキップする（脆弱性が見つかった場合はこの値に関係なく失敗する） |
 | `legacy-peer-deps` | boolean | `false` | `npm ci` に `--legacy-peer-deps` を付与するか（Next.js メジャーバージョン先取り等で peer dependency が ERESOLVE になる consumer 向け） |
 | `build-env-file` | string | `''` | ビルド時に `.env.local` としてコピーする env ファイルのパス |
 | `build-env` | string | `''` | ビルド時に `.env.local` に追記する KEY=VALUE 複数行（`build-env-file` の後に追記） |
@@ -159,6 +160,17 @@ jobs:
 
 `npm test` が DB 接続等を必要とする場合は、この reusable workflow では対応しない
 （サービスコンテナ等は呼び出し側 workflow で個別に組む、または将来 input で拡張する）。
+
+#### レジストリ障害時の挙動
+
+`npm audit` の失敗は「脆弱性が見つかった」と「レジストリの audit エンドポイントが応答しない」の 2 種類があり、
+前者だけがゲートとして意味を持つ。後者はコード側に打つ手が無く、そのまま落とすと障害の間すべての PR が止まる
+（2026-09-04 に npm の bulk advisory エンドポイントが断続的に無応答になり、npm 10 が退役済みの legacy quick
+エンドポイントへフォールバックして 503 / 400 で落ちた）。
+
+Audit ステップは npm CLI の固定文言 `audit endpoint returned an error` で両者を見分け、後者なら
+`--fetch-timeout=30000` で 3 回リトライしたうえで **warning を出して監査をスキップ**する（ジョブは成功）。
+障害でも必ず失敗させたい場合は `audit-fail-on-registry-error: true` を指定する。
 
 ## スクリプト自動検出
 
