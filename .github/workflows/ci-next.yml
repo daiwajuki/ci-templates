@@ -278,13 +278,17 @@ jobs:
         if: inputs.run-audit
         env:
           AUDIT_LEVEL: ${{ inputs.audit-level }}
-          AUDIT_OMIT_DEV: ${{ inputs.audit-omit-dev && '--omit=dev' || '' }}
+          AUDIT_OMIT_DEV: ${{ inputs.audit-omit-dev }}
           AUDIT_FAIL_ON_REGISTRY_ERROR: ${{ inputs.audit-fail-on-registry-error }}
         run: |
           set +e
+          audit_args=(--audit-level="$AUDIT_LEVEL" --fetch-timeout=30000 --fetch-retries=1)
+          if [ "$AUDIT_OMIT_DEV" = "true" ]; then
+            audit_args+=(--omit=dev)
+          fi
           attempts=3
           for attempt in $(seq 1 "$attempts"); do
-            out=$(npm audit --audit-level="$AUDIT_LEVEL" $AUDIT_OMIT_DEV --fetch-timeout=30000 --fetch-retries=1 2>&1)
+            out=$(npm audit "${audit_args[@]}" 2>&1)
             code=$?
             echo "$out"
             if [ "$code" -eq 0 ]; then
