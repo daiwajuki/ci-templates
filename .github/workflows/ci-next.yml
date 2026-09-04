@@ -49,6 +49,16 @@ on:
           既定は false（従来どおり dev 込みで監査する）。
         type: boolean
         default: false
+      audit-fail-on-registry-error:
+        description: |
+          npm audit が「脆弱性の検出」ではなく「レジストリの audit エンドポイント障害」で
+          落ちたときにジョブを失敗させるか。
+          既定 false は、3 回リトライしても届かなければ warning を出して監査をスキップする
+          （コード側に打つ手が無い障害で全 PR が止まるのを防ぐ）。脆弱性が見つかった場合は
+          この値に関係なく従来どおり失敗する。
+          true にすると従来どおり障害でも失敗させる（監査を必ず通したい consumer 向け）。
+        type: boolean
+        default: false
       legacy-peer-deps:
         description: |
           npm ci に --legacy-peer-deps を付与するか。
@@ -256,9 +266,45 @@ jobs:
         if: inputs.run-test && steps.scripts.outputs.has-test == 'true'
         run: npm test
 
+      # npm audit の失敗は 2 種類ある。「脆弱性が見つかった」は本来のゲートなので落とすが、
+      # 「レジストリの audit エンドポイントが応答しない」はコード側に打つ手が無く、
+      # そのまま落とすと障害の間すべての PR が止まる（2026-09-04: bulk advisory
+      # エンドポイントが断続的に無応答になり、npm 10 が退役済みの legacy quick
+      # エンドポイントへフォールバックして 503/400 で落ちた）。
+      # 両者は npm CLI が出す固定文言 "audit endpoint returned an error" で見分けられる
+      # （lib/utils/audit-error.js。npm 10 / 11 共通）。
+      # fetch-timeout は既定 5 分と長く、無応答のまま待つとリトライの意味が無いので短くする。
       - name: Audit
         if: inputs.run-audit
-        run: npm audit --audit-level="${{ inputs.audit-level }}" ${{ inputs.audit-omit-dev && '--omit=dev' || '' }}
+        env:
+          AUDIT_LEVEL: ${{ inputs.audit-level }}
+          AUDIT_OMIT_DEV: ${{ inputs.audit-omit-dev && '--omit=dev' || '' }}
+          AUDIT_FAIL_ON_REGISTRY_ERROR: ${{ inputs.audit-fail-on-registry-error }}
+        run: |
+          set +e
+          attempts=3
+          for attempt in $(seq 1 "$attempts"); do
+            out=$(npm audit --audit-level="$AUDIT_LEVEL" $AUDIT_OMIT_DEV --fetch-timeout=30000 --fetch-retries=1 2>&1)
+            code=$?
+            echo "$out"
+            if [ "$code" -eq 0 ]; then
+              exit 0
+            fi
+            if ! printf '%s' "$out" | grep -q 'audit endpoint returned an error'; then
+              # 脆弱性の検出（または想定外のエラー）。従来どおり失敗させる
+              exit "$code"
+            fi
+            echo "::warning::npm audit: レジストリの audit エンドポイントが応答しませんでした（${attempt}/${attempts} 回目）"
+            if [ "$attempt" -lt "$attempts" ]; then
+              sleep $((attempt * 20))
+            fi
+          done
+          if [ "$AUDIT_FAIL_ON_REGISTRY_ERROR" = "true" ]; then
+            echo "::error::npm audit: レジストリの audit エンドポイントに ${attempts} 回失敗しました（audit-fail-on-registry-error: true）"
+            exit 1
+          fi
+          echo "::warning title=npm audit をスキップしました::npm レジストリの audit エンドポイントに ${attempts} 回失敗したため、この run では脆弱性監査を行っていません（コードの問題ではありません）。復旧後の run で再び監査されます"
+          exit 0
 
       - name: Copy env file for build
         if: inputs.run-build && inputs.build-env-file != ''
