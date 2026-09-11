@@ -31,6 +31,7 @@ jobs:
 | `test-command` | string | `'pytest tests/ -v'` | テスト実行コマンド（`python -m` 経由で実行） |
 | `run-tests` | boolean | `true` | テストを実行するか |
 | `run-ruff` | boolean | `false` | `ruff check .` を実行 |
+| `run-ruff-format` | boolean | `false` | `ruff format --check --diff .` を実行（フォーマット崩れの検出）。`run-ruff` とは独立。採用側が `ruff format` を一括適用済みで `[tool.ruff.format]` を持つ場合に `true` にする |
 | `run-mypy` | boolean | `false` | `mypy .` を実行 |
 
 ## BidFlow の `test.yml` に組み込む例
