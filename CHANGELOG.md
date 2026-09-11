@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.0](https://github.com/daiwajuki/ci-templates/compare/v0.24.0...v0.25.0) (2026-09-11)
+
+
+### Added
+
+* **ci-fastapi:** run-ruff-format 入力を追加しフォーマット崩れを検出できるようにする ([#103](https://github.com/daiwajuki/ci-templates/issues/103)) ([01ecf13](https://github.com/daiwajuki/ci-templates/commit/01ecf131af690fae3d7cac5ff0c6336691a0be6c))
+
 ## [0.24.0](https://github.com/daiwajuki/ci-templates/compare/v0.23.0...v0.24.0) (2026-09-04)
 
 
