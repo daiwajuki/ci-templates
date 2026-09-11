@@ -40,6 +40,13 @@ on:
         description: ruff check を実行するか
         type: boolean
         default: false
+      run-ruff-format:
+        description: |
+          ruff format --check を実行するか（フォーマット崩れの検出）。
+          run-ruff とは独立。採用側が `ruff format` を一括適用し、
+          pyproject.toml に [tool.ruff.format] を持っている場合に true にする。
+        type: boolean
+        default: false
       run-mypy:
         description: mypy を実行するか
         type: boolean
@@ -120,6 +127,12 @@ jobs:
       - name: Lint (ruff)
         if: inputs.run-ruff
         run: ${{ steps.pyrun.outputs.cmd }} ruff check .
+
+      # --diff を付けて「どう直せばよいか」を CI ログ上で読めるようにする
+      # （--check だけだとファイル名しか出ない）。
+      - name: Format check (ruff format)
+        if: inputs.run-ruff-format
+        run: ${{ steps.pyrun.outputs.cmd }} ruff format --check --diff .
 
       - name: Type check (mypy)
         if: inputs.run-mypy
