@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.0](https://github.com/daiwajuki/ci-templates/compare/v0.25.0...v0.26.0) (2026-10-04)
+
+
+### Added
+
+* **ci-next:** parallel-jobs 入力で lint/typecheck/audit・test・build を並列ジョブにできるようにする ([#105](https://github.com/daiwajuki/ci-templates/issues/105)) ([8219057](https://github.com/daiwajuki/ci-templates/commit/8219057d40443dcdee53497edfea1edbec254e0d))
+
 ## [0.25.0](https://github.com/daiwajuki/ci-templates/compare/v0.24.0...v0.25.0) (2026-09-11)
 
 
