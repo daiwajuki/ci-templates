@@ -26,6 +26,7 @@ jobs:
 | `run-build` | boolean | `true` | `npm run build` を実行するか |
 | `run-test` | boolean | `false`（opt-in） | `npm test` を実行するか |
 | `run-audit` | boolean | `false`（opt-in） | `npm audit` を実行するか |
+| `parallel-jobs` | boolean | `false`（opt-in） | lint / typecheck / audit・test・build を別ジョブで並列実行するか。課金分数が増えるので、テストやビルドが長い consumer だけが有効化する（[並列実行する](#並列実行する) 参照） |
 | `audit-level` | string | `'high'` | `npm audit --audit-level` に渡す最小重要度 |
 | `audit-omit-dev` | boolean | `false` | `npm audit` に `--omit=dev` を付与し、本番依存のみをゲート対象にする。devDependencies（lint/test 系ツールチェーン）の脆弱性に上流の非破壊修正が無く全 PR がブロックされ続ける場合の逃げ道。本番依存の防御は維持される |
 | `audit-fail-on-registry-error` | boolean | `false` | `npm audit` がレジストリの audit エンドポイント障害で落ちたときにジョブを失敗させるか。既定は 3 回リトライ後に warning を出して監査をスキップする（脆弱性が見つかった場合はこの値に関係なく失敗する） |
@@ -171,6 +172,31 @@ jobs:
 Audit ステップは npm CLI の固定文言 `audit endpoint returned an error` で両者を見分け、後者なら
 `--fetch-timeout=30000` で 3 回リトライしたうえで **warning を出して監査をスキップ**する（ジョブは成功）。
 障害でも必ず失敗させたい場合は `audit-fail-on-registry-error: true` を指定する。
+
+### 並列実行する
+
+既定では 1 ジョブで lint → typecheck → test → audit → build を直列に流す。`parallel-jobs: true` にすると、
+同じステップ定義を matrix で次の 3 ジョブに分けて同時に走らせる（各ジョブは担当外のステップを skip する）。
+
+| ジョブ名 | 実行するステップ |
+|---|---|
+| `Lint / Typecheck / Audit` | lint・typecheck・audit |
+| `Test` | test |
+| `Build` | build（`build-env` / `build-env-file` の書き出しを含む） |
+
+```yaml
+jobs:
+  ci:
+    uses: daiwajuki/ci-templates/.github/workflows/ci-next.yml@v0
+    with:
+      parallel-jobs: true
+      run-test: true
+```
+
+- 壁時計は「最長ジョブ + セットアップ（checkout・colocate・npm ci で約 1 分）」になる。ICPEstimating では直列約 6〜7 分の想定が約 3 分台になる見込み
+- その代わりセットアップがジョブ数ぶん重複し、private repo の Actions は分単位切り上げで課金されるため **1 run あたり数分ぶん課金分数が増える**（daiwajuki org は Free プランで無料枠を超えると従量課金）
+- `fail-fast: false` なので、lint が落ちても test / build は最後まで走って結果が出る
+- 既定（`false`）ではジョブ名も `Lint / Typecheck / Build` のまま変わらない
 
 ## スクリプト自動検出
 

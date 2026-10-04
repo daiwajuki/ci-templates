@@ -30,6 +30,14 @@ on:
           package.json に test スクリプトが無ければ true でもスキップされる。
         type: boolean
         default: false
+      parallel-jobs:
+        description: |
+          lint / typecheck / audit、test、build を別ジョブに分けて並列実行するか。
+          壁時計は「最長ジョブ + セットアップ約 1 分」まで縮むが、checkout と npm ci が
+          ジョブ数ぶん重複し、課金分数は 1 run あたり数分増える（private repo の Actions は
+          分単位切り上げで課金）。テストやビルドが長い consumer だけが有効化する想定で既定は false。
+        type: boolean
+        default: false
       run-audit:
         description: |
           npm audit ステップを実行するか。
@@ -140,8 +148,13 @@ permissions:
 
 jobs:
   ci:
-    name: Lint / Typecheck / Build
+    # 既定（parallel-jobs: false）は従来どおり 1 ジョブで全ステップを流し、ジョブ名も変えない。
+    # 有効時は同じステップ定義を matrix で 3 ジョブに展開し、各ジョブは担当ステップだけを実行する。
+    name: ${{ matrix.label }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.parallel-jobs && '{"include":[{"task":"static","label":"Lint / Typecheck / Audit"},{"task":"test","label":"Test"},{"task":"build","label":"Build"}]}' || '{"include":[{"task":"all","label":"Lint / Typecheck / Build"}]}') }}
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
@@ -255,15 +268,15 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Lint
-        if: inputs.run-lint && steps.scripts.outputs.has-lint == 'true'
+        if: (matrix.task == 'all' || matrix.task == 'static') && inputs.run-lint && steps.scripts.outputs.has-lint == 'true'
         run: npm run lint
 
       - name: Typecheck
-        if: inputs.run-typecheck && steps.scripts.outputs.has-typecheck == 'true'
+        if: (matrix.task == 'all' || matrix.task == 'static') && inputs.run-typecheck && steps.scripts.outputs.has-typecheck == 'true'
         run: npm run typecheck
 
       - name: Test
-        if: inputs.run-test && steps.scripts.outputs.has-test == 'true'
+        if: (matrix.task == 'all' || matrix.task == 'test') && inputs.run-test && steps.scripts.outputs.has-test == 'true'
         run: npm test
 
       # npm audit の失敗は 2 種類ある。「脆弱性が見つかった」は本来のゲートなので落とすが、
@@ -275,7 +288,7 @@ jobs:
       # （lib/utils/audit-error.js。npm 10 / 11 共通）。
       # fetch-timeout は既定 5 分と長く、無応答のまま待つとリトライの意味が無いので短くする。
       - name: Audit
-        if: inputs.run-audit
+        if: (matrix.task == 'all' || matrix.task == 'static') && inputs.run-audit
         env:
           AUDIT_LEVEL: ${{ inputs.audit-level }}
           AUDIT_OMIT_DEV: ${{ inputs.audit-omit-dev }}
@@ -311,18 +324,18 @@ jobs:
           exit 0
 
       - name: Copy env file for build
-        if: inputs.run-build && inputs.build-env-file != ''
+        if: (matrix.task == 'all' || matrix.task == 'build') && inputs.run-build && inputs.build-env-file != ''
         run: cp "${{ inputs.build-env-file }}" .env.local
 
       - name: Append build-env vars
-        if: inputs.run-build && inputs.build-env != ''
+        if: (matrix.task == 'all' || matrix.task == 'build') && inputs.run-build && inputs.build-env != ''
         env:
           BUILD_ENV: ${{ inputs.build-env }}
         run: |
           printf '%s\n' "$BUILD_ENV" >> .env.local
 
       - name: Build
-        if: inputs.run-build
+        if: (matrix.task == 'all' || matrix.task == 'build') && inputs.run-build
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: '1'

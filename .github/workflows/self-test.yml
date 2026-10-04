@@ -44,6 +44,19 @@ jobs:
       run-test: true
       run-audit: true
 
+  test-ci-next-parallel:
+    name: Test ci-next.yml parallel-jobs (minimal fixture)
+    needs: lint-workflows
+    uses: ./.github/workflows/ci-next.yml
+    with:
+      working-directory: fixtures/minimal-next
+      parallel-jobs: true
+      run-lint: true
+      run-typecheck: true
+      run-build: true
+      run-test: true
+      run-audit: true
+
   test-ci-laravel:
     name: Test ci-laravel.yml (minimal fixture)
     needs: lint-workflows
