@@ -7,8 +7,5 @@
     "lint": "echo 'lint ok'",
     "typecheck": "echo 'typecheck ok'",
     "test": "echo 'test ok'"
-  },
-  "volta": {
-    "node": "20"
   }
 }

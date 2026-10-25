@@ -1,0 +1,8 @@
+{
+  "name": "volta-only-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "volta": {
+    "node": "22"
+  }
+}

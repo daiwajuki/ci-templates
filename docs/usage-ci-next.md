@@ -19,7 +19,7 @@ jobs:
 
 | input | 型 | デフォルト | 説明 |
 |---|---|---|---|
-| `node-version` | string | `'20'` | Volta フィールドがない場合のフォールバック |
+| `node-version` | string | `'20'` | `.node-version` も Volta フィールドもない場合のフォールバック |
 | `working-directory` | string | `'.'` | Next.js プロジェクトルート |
 | `run-lint` | boolean | `true` | `npm run lint` を実行するか |
 | `run-typecheck` | boolean | `true` | `npm run typecheck` を実行するか |
@@ -203,19 +203,19 @@ jobs:
 `lint` / `typecheck` / `test` ステップは `package.json` の `scripts` にそのキーが存在する場合のみ実行される。  
 スクリプトが無い場合はスキップされるため、エラーにならない。`audit` はスクリプト検出の対象外（`npm audit` 組み込みコマンドを直接実行）。
 
-## Volta 対応
+## Node バージョンの決まり方
 
-`package.json` に `volta.node` フィールドがある場合、そのバージョンが優先される。
+次の順で最初に見つかったものが使われる。
 
-```json
-{
-  "volta": {
-    "node": "20"
-  }
-}
+1. `.node-version`（`working-directory` から repo ルートへ遡って最初に見つかったもの）
+2. `working-directory` の `package.json` の `volta.node`（Volta は 2025-11 に保守終了。移行が済むまでの互換用）
+3. `node-version` input（デフォルト `20`）
+
+新規・移行済みのリポジトリは、repo 直下に `.node-version` を置く。
+
+```text
+24
 ```
-
-ない場合は `node-version` input（デフォルト `20`）が使われる。
 
 ## トラブルシュート
 

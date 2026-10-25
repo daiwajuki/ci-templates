@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       node-version:
-        description: Node バージョン（volta フィールドがない場合のフォールバック）
+        description: Node バージョン（.node-version も volta フィールドもない場合のフォールバック）
         type: string
         default: '20'
       working-directory:
