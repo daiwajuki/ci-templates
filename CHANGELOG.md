@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.0](https://github.com/daiwajuki/ci-templates/compare/v0.26.0...v0.27.0) (2026-10-25)
+
+
+### Added
+
+* **setup-node:** .node-version を優先して読み、Dockerfile テンプレを Node 24 にする ([#107](https://github.com/daiwajuki/ci-templates/issues/107)) ([2a4289d](https://github.com/daiwajuki/ci-templates/commit/2a4289d654b18644b4220f3810003805e228791d))
+
 ## [0.26.0](https://github.com/daiwajuki/ci-templates/compare/v0.25.0...v0.26.0) (2026-10-04)
 
 
