@@ -141,7 +141,7 @@ node ../_ci-templates/scripts/sync-templates.mjs \
 | `Dockerfile は既存で内容が異なります` | 上書き保護 | `--dry-run` で差分確認 → `--force` で上書き |
 | Cloud Run で `port 3000` を listen している | template は `PORT=8080`、採用側で別 PORT を強制している | `next.config.js` 等で PORT override を削除 or `--output` で別パスに保存して手調整 |
 | `compose` で port 競合 | `ports.json` の割当を `.env` に反映していない | `POSTGRES_PORT=5438` 等を `.env` に追加 |
-| `node: command not found` | Node 20+ 未インストール | `volta install node@20` |
+| `node: command not found` | Node 未インストール | `fnm install 24`（`.node-version` があれば `fnm install`） |
 
 ## 関連
 

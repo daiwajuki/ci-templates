@@ -7,14 +7,14 @@
 
 | ファイル | ベース | サイズ | 用途 |
 |---|---|---|---|
-| `Dockerfile.alpine` | `node:20-alpine` | ~50MB | 標準。新規プロジェクトはこちら |
-| `Dockerfile.slim`   | `node:20-slim`   | ~120MB | glibc 必須の native deps（puppeteer / sharp / canvas 等） |
+| `Dockerfile.alpine` | `node:24-alpine` | ~50MB | 標準。新規プロジェクトはこちら |
+| `Dockerfile.slim`   | `node:24-slim`   | ~120MB | glibc 必須の native deps（puppeteer / sharp / canvas 等） |
 
 ## 前提
 
 - `next.config.js` または `next.config.ts` で `output: 'standalone'` を設定
 - Cloud Run の listen port: 8080（テンプレ既定）
-- Node 20 LTS（Volta `volta pin node@20 npm@10` 推奨）
+- Node 24 LTS（リポジトリ直下の `.node-version` に `24` を書く）
 
 ## カスタマイズポイント
 

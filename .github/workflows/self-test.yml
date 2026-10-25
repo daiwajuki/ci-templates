@@ -32,6 +32,35 @@ jobs:
             -s .github/adopters.schema.json \
             -d .github/adopters.json
 
+  test-setup-node-volta:
+    name: Test setup-node-volta (${{ matrix.case.dir }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        case:
+          # .node-version が volta より優先される
+          - { dir: fixtures/minimal-next, expected: '24' }
+          # .node-version が無ければ volta.node を読む（移行期間の互換）
+          - { dir: fixtures/volta-only, expected: '22' }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node (local action)
+        id: setup
+        uses: ./.github/actions/setup-node-volta
+        with:
+          working-directory: ${{ matrix.case.dir }}
+      - name: Assert detected version
+        env:
+          DETECTED: ${{ steps.setup.outputs.node-version }}
+          EXPECTED: ${{ matrix.case.expected }}
+        run: |
+          set -euo pipefail
+          actual_major=$(node -p 'process.versions.node.split(".")[0]')
+          echo "detected=$DETECTED actual=$(node --version)"
+          test "$DETECTED" = "$EXPECTED"
+          test "$actual_major" = "$EXPECTED"
+
   test-ci-next:
     name: Test ci-next.yml (minimal fixture)
     needs: lint-workflows

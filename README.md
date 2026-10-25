@@ -122,7 +122,7 @@ _ci-templates/
 │   │   └── notify-adopters.yml            # ★ release: published で adopters.json の各 repo に Issue 投稿
 │   ├── adopters.json                       # ★ notify-adopters.yml の宛先リスト
 │   └── actions/
-│       └── setup-node-volta/              # Volta 対応 Node セットアップ
+│       └── setup-node-volta/              # .node-version / Volta 対応 Node セットアップ
 ├── dockerfiles/                           # ★ Phase C: copy 配布
 │   ├── README.md
 │   ├── next/                              # Dockerfile.alpine, Dockerfile.slim
@@ -210,7 +210,7 @@ node scripts/audit-ci-drift.mjs --remote
 | 症状 | 原因 | 対処 |
 |---|---|---|
 | `error parsing called workflow` | タグの指定ミス | `@v0` または `@<sha>` で pin、ブランチ名は不可 |
-| Volta セットアップで Node が違う | `package.json` の `volta.node` 未設定 | `volta pin node@20 npm@10` を実行 |
+| CI の Node バージョンが違う | `.node-version` 未設定 | repo 直下に `.node-version`（例: `24`）を置く |
 | `secrets.X` が読めない | reusable workflow への secrets inherit 漏れ | 呼び出し側に `secrets: inherit` を追加 |
 | MAJOR 更新でジョブ落ち | 入力 API 破壊変更 | `CHANGELOG.md` 確認、tag を `@v0` から `@v1` に上げる前に self-test 通す |
 | `gcloud run services update` でシークレット/環境変数を変えても反映されない | deploy 時にトラフィックをリビジョン名で固定しているため（`--to-latest` は Ready=False のリビジョンへ流れる事故があり不採用） | 新リビジョンは作られるがトラフィックが向かない。デプロイを再実行するか `gcloud run services update-traffic <service> --region <region> --to-latest` を併用する。現在の固定先は Job Summary の Traffic 行に出力される |
