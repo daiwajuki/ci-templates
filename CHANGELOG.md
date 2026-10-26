@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.0](https://github.com/daiwajuki/ci-templates/compare/v0.27.0...v0.28.0) (2026-10-26)
+
+
+### Added
+
+* **ci-next:** Node の既定値を 24 にする ([#109](https://github.com/daiwajuki/ci-templates/issues/109)) ([3cc12cf](https://github.com/daiwajuki/ci-templates/commit/3cc12cf9a939e25cb21717070588f25a25fd4168))
+
 ## [0.27.0](https://github.com/daiwajuki/ci-templates/compare/v0.26.0...v0.27.0) (2026-10-25)
 
 
