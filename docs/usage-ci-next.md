@@ -19,7 +19,7 @@ jobs:
 
 | input | 型 | デフォルト | 説明 |
 |---|---|---|---|
-| `node-version` | string | `'20'` | `.node-version` も Volta フィールドもない場合のフォールバック |
+| `node-version` | string | `'24'` | `.node-version` も Volta フィールドもない場合のフォールバック |
 | `working-directory` | string | `'.'` | Next.js プロジェクトルート |
 | `run-lint` | boolean | `true` | `npm run lint` を実行するか |
 | `run-typecheck` | boolean | `true` | `npm run typecheck` を実行するか |
@@ -209,7 +209,7 @@ jobs:
 
 1. `.node-version`（`working-directory` から repo ルートへ遡って最初に見つかったもの）
 2. `working-directory` の `package.json` の `volta.node`（Volta は 2025-11 に保守終了。移行が済むまでの互換用）
-3. `node-version` input（デフォルト `20`）
+3. `node-version` input（デフォルト `24`）
 
 新規・移行済みのリポジトリは、repo 直下に `.node-version` を置く。
 
