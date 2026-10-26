@@ -4,7 +4,7 @@ description: .node-version（無ければ package.json の volta.node）を尊�
 inputs:
   fallback-version:
     description: .node-version も volta フィールドもない場合の Node バージョン
-    default: '20'
+    default: '24'
   working-directory:
     description: .node-version / package.json を探すディレクトリ
     default: '.'
