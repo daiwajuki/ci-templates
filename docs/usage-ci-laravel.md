@@ -32,6 +32,23 @@ jobs:
 | `test-args` | string | `''` | artisan test 追加引数（例: `--parallel`） |
 | `env-from-example` | boolean | `true` | `.env.example` をコピーして `key:generate` |
 | `cache-composer` | boolean | `true` | composer キャッシュを使う |
+| `colocate-repo` | string | `''` | composer install 前に sibling パスへ配置する外部リポジトリ（`owner/repo` 形式）。composer の path repository で共通基盤を読む consumer 向け。ci / postgres-tests の両ジョブに置く |
+| `colocate-ref` | string | `''` | colocate-repo のチェックアウト ref（タグ・ブランチ・SHA） |
+| `colocate-path` | string | `''` | colocate-repo の配置先（`GITHUB_WORKSPACE` からの相対パス） |
+
+private な colocate-repo は secrets の `external-checkout-app-id` / `external-checkout-app-private-key`（GitHub App）で checkout する（ci-next.yml と同じ）。
+
+```yaml
+    with:
+      working-directory: api
+      # api/composer.json の path repository: ../../_catalog/packages/catalog-php
+      colocate-repo: daiwajuki/catalog
+      colocate-ref: catalog-v0.1.0
+      colocate-path: ../_catalog
+    secrets:
+      external-checkout-app-id: ${{ secrets.DAIWAJUKI_APP_ID }}
+      external-checkout-app-private-key: ${{ secrets.DAIWAJUKI_APP_PRIVATE_KEY }}
+```
 
 ## ICPCostHub の `ci.yml` に組み込む例
 
