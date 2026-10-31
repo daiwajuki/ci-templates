@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.0](https://github.com/daiwajuki/ci-templates/compare/v0.29.0...v0.30.0) (2026-10-31)
+
+
+### Added
+
+* ci-next に 3 本目の colocate 枠、ci-laravel に colocate 枠を足す ([#114](https://github.com/daiwajuki/ci-templates/issues/114)) ([411b1f6](https://github.com/daiwajuki/ci-templates/commit/411b1f6bf9d74cef7db9e383bac0a25572a6ad16))
+
 ## [0.29.0](https://github.com/daiwajuki/ci-templates/compare/v0.28.0...v0.29.0) (2026-10-31)
 
 
