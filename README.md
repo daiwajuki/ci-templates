@@ -14,6 +14,7 @@
 | Reusable Workflow | `.github/workflows/deploy-cloudrun-fastapi.yml` | live 参照（`uses:`） |
 | Reusable Workflow | `.github/workflows/secret-scan.yml` | live 参照（`uses:`） |
 | Composite Action | `.github/actions/setup-node-volta/` | live 参照（`uses:`） |
+| Composite Action | `.github/actions/apply-auth-migrations/` | live 参照（`uses:`）。`deploy-cloudrun-next.yml` の `run-auth-migrations` から呼ばれる |
 | Dockerfile テンプレート | `dockerfiles/` | copy 配布（Phase C〜） |
 | docker-compose テンプレート | `docker-compose/` | copy 配布（Phase C〜） |
 | Renovate / release-please | `configs/` | copy 配布（Phase C〜） |
