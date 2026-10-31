@@ -39,6 +39,9 @@ jobs:
 | `colocate-repo-2` | string | `''` | 2つ目の colocate 対象リポジトリ。`_auth` + `_design-system` の両方を `file:` 依存する consumer 向け |
 | `colocate-ref-2` | string | `''` | colocate-repo-2 のチェックアウト ref |
 | `colocate-path-2` | string | `''` | colocate-repo-2 の配置先 |
+| `colocate-repo-3` | string | `''` | 3つ目の colocate 対象リポジトリ。`_auth` + `_design-system` に加えて業務基盤（`_catalog` 等）も `file:` 依存する consumer 向け |
+| `colocate-ref-3` | string | `''` | colocate-repo-3 のチェックアウト ref |
+| `colocate-path-3` | string | `''` | colocate-repo-3 の配置先 |
 
 ## secrets 一覧
 
@@ -131,6 +134,18 @@ jobs:
     secrets:
       external-checkout-app-id: ${{ secrets.DAIWAJUKI_APP_ID }}
       external-checkout-app-private-key: ${{ secrets.DAIWAJUKI_APP_PRIVATE_KEY }}
+```
+
+### 業務基盤（`_catalog` 等）も co-locate する
+
+`_auth` + `_design-system` に加えて、業務基盤（`@daiwajuki/catalog` の `file:../../_catalog/packages/catalog-ts` 等）にも
+依存する consumer 向け。`colocate-repo-3` は 1・2 本目と独立して動作し、同じトークンを再利用する。
+配置先に `package.json` があれば、1・2 本目と同じく `npm install --omit=dev` で依存関係を入れる:
+
+```yaml
+      colocate-repo-3: daiwajuki/catalog
+      colocate-ref-3: catalog-v0.1.0
+      colocate-path-3: ../_catalog
 ```
 
 ### lint のみ（typecheck・build はスキップ）

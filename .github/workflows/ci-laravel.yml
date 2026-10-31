@@ -62,6 +62,32 @@ on:
         description: 'postgres-tests ジョブの php artisan test に渡す追加引数（既定は test-args と同じ）'
         type: string
         default: ''
+      colocate-repo:
+        description: |
+          composer install 前に外部リポジトリを sibling パスに配置する（"owner/repo" 形式）。
+          composer の path repository（例: ../../_catalog/packages/catalog-php）で共通基盤を読む consumer 向け。
+          未指定なら何もしない（既存 caller への影響なし）。ci / postgres-tests の両ジョブに置く。
+        type: string
+        default: ''
+      colocate-ref:
+        description: colocate-repo のチェックアウト ref（タグ・ブランチ・SHA）
+        type: string
+        default: ''
+      colocate-path:
+        description: |
+          colocate-repo の配置先（GITHUB_WORKSPACE からの相対パス）。
+          例: "../_catalog" で workspace の親ディレクトリに兄弟配置。
+        type: string
+        default: ''
+    secrets:
+      external-checkout-app-id:
+        description: |
+          GitHub App ID。external-checkout-app-private-key と組で colocate-repo の
+          short-lived installation token を mint する（ci-next.yml と同じ）。
+        required: false
+      external-checkout-app-private-key:
+        description: GitHub App private key (PEM 全文)。external-checkout-app-id と組で必須。
+        required: false
 
 # Node.js 24 を先取り opt-in (2026-06-02 で強制移行、それ以前に互換性を検証する)。
 # 参考: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
@@ -83,6 +109,38 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # ─── colocate（composer の path repository が兄弟の共通基盤を読む consumer 向け）──
+      # トークンは ci-next.yml と同じく App を優先し、無ければ github.token。
+      - name: Mint App installation token (colocate)
+        if: inputs.colocate-repo != ''
+        id: app-token
+        uses: daiwajuki/ci-templates/.github/actions/mint-app-token@v0
+        with:
+          app-id: ${{ secrets.external-checkout-app-id }}
+          app-private-key: ${{ secrets.external-checkout-app-private-key }}
+
+      - name: Checkout colocate-repo
+        if: inputs.colocate-repo != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.colocate-repo }}
+          ref: ${{ inputs.colocate-ref }}
+          token: ${{ steps.app-token.outputs.token || github.token }}
+          path: __colocate__
+
+      - name: Place colocate-repo at expected path
+        if: inputs.colocate-repo != ''
+        working-directory: ${{ github.workspace }}
+        env:
+          COLOCATE_PATH: ${{ inputs.colocate-path }}
+        run: |
+          set -euo pipefail
+          dest="$GITHUB_WORKSPACE/$COLOCATE_PATH"
+          mkdir -p "$(dirname "$dest")"
+          rm -rf "$dest"
+          cp -r "$GITHUB_WORKSPACE/__colocate__" "$dest"
+          rm -rf "$GITHUB_WORKSPACE/__colocate__"
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -154,6 +212,38 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # ─── colocate（composer の path repository が兄弟の共通基盤を読む consumer 向け）──
+      # トークンは ci-next.yml と同じく App を優先し、無ければ github.token。
+      - name: Mint App installation token (colocate)
+        if: inputs.colocate-repo != ''
+        id: app-token
+        uses: daiwajuki/ci-templates/.github/actions/mint-app-token@v0
+        with:
+          app-id: ${{ secrets.external-checkout-app-id }}
+          app-private-key: ${{ secrets.external-checkout-app-private-key }}
+
+      - name: Checkout colocate-repo
+        if: inputs.colocate-repo != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.colocate-repo }}
+          ref: ${{ inputs.colocate-ref }}
+          token: ${{ steps.app-token.outputs.token || github.token }}
+          path: __colocate__
+
+      - name: Place colocate-repo at expected path
+        if: inputs.colocate-repo != ''
+        working-directory: ${{ github.workspace }}
+        env:
+          COLOCATE_PATH: ${{ inputs.colocate-path }}
+        run: |
+          set -euo pipefail
+          dest="$GITHUB_WORKSPACE/$COLOCATE_PATH"
+          mkdir -p "$(dirname "$dest")"
+          rm -rf "$dest"
+          cp -r "$GITHUB_WORKSPACE/__colocate__" "$dest"
+          rm -rf "$GITHUB_WORKSPACE/__colocate__"
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
