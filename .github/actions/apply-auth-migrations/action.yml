@@ -1,0 +1,196 @@
+name: Apply @daiwajuki/auth migrations
+description: |
+  @daiwajuki/auth (daiwajuki/daiwajuki-auth) の SQL migration
+  (`db-schema/drizzle/migrations/*.sql`) を consumer の本番 DB に当てる composite action。
+  Cloud SQL Auth Proxy を立て、_auth の `scripts/migrate-schema.mjs` (daiwajuki-auth#204) を流す。
+
+  Portal 本番で 0002〜0006 が未適用のまま auth の版だけ進み、1 か月
+  `column "org_id" does not exist` が出続けた (daiwajuki-auth#203)。デプロイの前段で
+  これを呼び、失敗したらデプロイを止めることで「スキーマが古いまま新しい auth が動く」を防ぐ。
+
+  前提: 呼び出し側の job で google-github-actions/auth と setup-gcloud が済んでいること。
+  WIF の SA には roles/cloudsql.client と、database-url-secret への
+  roles/secretmanager.secretAccessor が要る。
+
+inputs:
+  auth-ref:
+    description: |
+      当てる migration を取る daiwajuki-auth の ref。consumer が pin している版のタグ
+      (例: v7.19.0) を渡す。main 等のブランチは渡さない (版と migration がずれる)。
+    required: true
+  runner-ref:
+    description: |
+      migrate-schema.mjs を取る daiwajuki-auth の ref。空なら auth-ref と同じ。
+      auth-ref の版に migrate-schema.mjs がまだ無い (v7.19.0 以前) ときだけ、
+      それを含む新しい ref を渡す。migration 本体は常に auth-ref から読む。
+    required: false
+    default: ''
+  mode:
+    description: |
+      apply (適用) / check (未適用があれば失敗、DB は変えない) / dry-run (状態の表示だけ)。
+    required: false
+    default: apply
+  cloudsql-instance:
+    description: Cloud SQL の接続名 (例 my-project:asia-northeast1:portal)
+    required: true
+  database-url-secret:
+    description: |
+      接続文字列 (postgresql://USER:PW@HOST/DB...) を持つ Secret Manager のシークレット名。
+      Cloud Run に DATABASE_URL として注入しているものと同じでよい。ホスト部
+      (unix socket の host= 指定を含む) は Auth Proxy (127.0.0.1) に差し替えて使う。
+    required: true
+  gcp-project-id:
+    description: シークレットを持つ GCP プロジェクト ID
+    required: true
+  proxy-port:
+    description: Auth Proxy の待ち受けポート。runner 上の別 Postgres と取り違えないよう 5432 を避ける
+    required: false
+    default: '5439'
+  create-database:
+    description: 接続先 DB が無ければ作る (migrate-schema の --create-database)。既定 false
+    required: false
+    default: 'false'
+  token:
+    description: |
+      daiwajuki-auth (private) を checkout する token。mint-app-token の出力
+      (GitHub App installation token) を渡す。
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Validate inputs
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        AUTH_REF: ${{ inputs.auth-ref }}
+      run: |
+        set -euo pipefail
+        case "$MODE" in
+          apply|check|dry-run) ;;
+          *) echo "::error::mode は apply / check / dry-run のいずれか (指定: $MODE)"; exit 1 ;;
+        esac
+        if ! [[ "$AUTH_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::warning::auth-ref ($AUTH_REF) がタグ (vX.Y.Z) ではありません。consumer の pin と同じタグを渡してください"
+        fi
+
+    # pg だけを入れる最小ツリー。_auth の npm ci は peer 依存 (ui-design 等) を要求し、
+    # DB と無関係な理由で落ちうるので使わない。migrate-schema.mjs の import("pg") は
+    # auth/scripts → auth → この親ディレクトリの node_modules の順に解決される。
+    - name: Prepare runner directory
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p __auth_migrations__
+        echo '{"private":true}' > __auth_migrations__/package.json
+
+    - name: Checkout daiwajuki-auth (migrations)
+      uses: actions/checkout@v4
+      with:
+        repository: daiwajuki/daiwajuki-auth
+        ref: ${{ inputs.auth-ref }}
+        token: ${{ inputs.token }}
+        path: __auth_migrations__/auth
+        persist-credentials: false
+
+    - name: Checkout daiwajuki-auth (runner)
+      if: inputs.runner-ref != '' && inputs.runner-ref != inputs.auth-ref
+      uses: actions/checkout@v4
+      with:
+        repository: daiwajuki/daiwajuki-auth
+        ref: ${{ inputs.runner-ref }}
+        token: ${{ inputs.token }}
+        path: __auth_migrations__/runner
+        persist-credentials: false
+
+    - name: Resolve runner script
+      id: runner
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ -d __auth_migrations__/runner ]; then DIR=__auth_migrations__/runner; else DIR=__auth_migrations__/auth; fi
+        SCRIPT="$DIR/scripts/migrate-schema.mjs"
+        if [ ! -f "$SCRIPT" ]; then
+          echo "::error::$SCRIPT がありません。auth-ref の版に migrate-schema.mjs が無い場合は、それを含む ref を runner-ref に渡してください"
+          exit 1
+        fi
+        echo "script=$SCRIPT" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+
+    - name: Install pg
+      shell: bash
+      working-directory: __auth_migrations__
+      run: |
+        set -euo pipefail
+        # _auth の package-lock と同じ版
+        npm install --no-audit --no-fund --no-package-lock pg@8.20.0
+
+    - name: Start Cloud SQL Auth Proxy
+      shell: bash
+      env:
+        INSTANCE: ${{ inputs.cloudsql-instance }}
+        PORT: ${{ inputs.proxy-port }}
+      run: |
+        set -euo pipefail
+        curl -sSL -o "$RUNNER_TEMP/cloud-sql-proxy" \
+          https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.0/cloud-sql-proxy.linux.amd64
+        chmod +x "$RUNNER_TEMP/cloud-sql-proxy"
+        "$RUNNER_TEMP/cloud-sql-proxy" --port "$PORT" "$INSTANCE" > "$RUNNER_TEMP/cloud-sql-proxy.log" 2>&1 &
+        echo $! > "$RUNNER_TEMP/cloud-sql-proxy.pid"
+        for _ in $(seq 1 30); do
+          if nc -z 127.0.0.1 "$PORT"; then
+            echo "Cloud SQL Auth Proxy が接続を受け付けました ($INSTANCE → 127.0.0.1:$PORT)"
+            exit 0
+          fi
+          sleep 1
+        done
+        cat "$RUNNER_TEMP/cloud-sql-proxy.log"
+        echo "::error::Cloud SQL Auth Proxy が 30 秒以内に起動しませんでした"
+        exit 1
+
+    - name: Run migrate-schema
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        SECRET: ${{ inputs.database-url-secret }}
+        PROJECT: ${{ inputs.gcp-project-id }}
+        PORT: ${{ inputs.proxy-port }}
+        CREATE_DATABASE: ${{ inputs.create-database }}
+        SCRIPT: ${{ steps.runner.outputs.script }}
+      run: |
+        set -euo pipefail
+        RAW="$(gcloud secrets versions access latest --secret="$SECRET" --project="$PROJECT")"
+        # Secret Manager から取った値は GitHub Actions の自動マスク対象外
+        echo "::add-mask::${RAW}"
+
+        # Cloud Run 向けの接続文字列 (unix socket の host= / sslmode) を Auth Proxy 向けに組み直す。
+        # proxy 経由は平文 TCP なので sslmode=require を残すと接続できない。
+        # `postgresql://USER:PW@/DB?host=/cloudsql/...` はホストが空で URL として読めないので仮のホストを補う。
+        # shellcheck disable=SC2016  # 単引用符の中は node のコード（$1 は正規表現の後方参照）
+        DATABASE_URL="$(RAW="$RAW" PORT="$PORT" node -e '
+          const raw = process.env.RAW.replace(/^([a-z]+:\/\/(?:[^/@]*@)?)\//, "$1localhost/");
+          const u = new URL(raw);
+          u.hostname = "127.0.0.1";
+          u.port = process.env.PORT;
+          u.searchParams.delete("host");
+          u.searchParams.delete("sslmode");
+          process.stdout.write(u.toString());
+        ')"
+        echo "::add-mask::${DATABASE_URL}"
+        export DATABASE_URL
+
+        ARGS=("--$MODE" --migrations-dir __auth_migrations__/auth/db-schema/drizzle/migrations)
+        # 127.0.0.1 はスクリプト上ローカル扱いだが、向き先は本番なので明示する
+        if [ "$MODE" = "apply" ]; then ARGS+=(--allow-remote); fi
+        if [ "$CREATE_DATABASE" = "true" ]; then ARGS+=(--create-database); fi
+        node "$SCRIPT" "${ARGS[@]}"
+
+    - name: Stop Cloud SQL Auth Proxy
+      if: always()
+      shell: bash
+      run: |
+        if [ -f "$RUNNER_TEMP/cloud-sql-proxy.pid" ]; then kill "$(cat "$RUNNER_TEMP/cloud-sql-proxy.pid")" 2>/dev/null || true; fi
+        rm -rf __auth_migrations__

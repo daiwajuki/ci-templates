@@ -75,6 +75,41 @@ jobs:
 
 ※ ランタイム SA に `roles/cloudsql.client` が必要。複数インスタンスはカンマ区切り。
 
+## @daiwajuki/auth の migration をデプロイ前に当てる（opt-in）
+
+`run-auth-migrations: true` にすると、イメージのビルド後・Cloud Run へのデプロイ前に、`@daiwajuki/auth` の SQL migration（`db-schema/drizzle/migrations/*.sql`）を本番 DB に当てる。中身は `.github/actions/apply-auth-migrations`（Cloud SQL Auth Proxy + daiwajuki-auth の `scripts/migrate-schema.mjs`）。**失敗したらデプロイしない**ので、スキーマが古いまま新しい auth が動くリビジョンは作られない。
+
+背景: Portal 本番で 0002〜0006 が未適用のまま auth が `main` 追従で進み、1 か月 `column "org_id" does not exist` が出続けた（daiwajuki-auth#203）。
+
+```yaml
+jobs:
+  deploy:
+    uses: daiwajuki/ci-templates/.github/workflows/deploy-cloudrun-next.yml@v0
+    with:
+      build-mode: image
+      service-name: portal-web
+      cloudsql-instances: my-project:asia-northeast1:portal
+      secrets-yaml: |
+        DATABASE_URL=portal-database-url:latest
+      additional-build-context-repos: |
+        auth=daiwajuki/daiwajuki-auth@v7.19.0
+      run-auth-migrations: true
+      auth-migrations-ref: v7.19.0                 # auth=…@ と同じタグ
+      auth-migrations-runner-ref: main             # v7.19.0 には migrate-schema.mjs が無いため（次のタグからは不要）
+      auth-migrations-database-url-secret: portal-database-url
+    secrets:
+      external-checkout-app-id: ${{ secrets.DAIWAJUKI_APP_ID }}
+      external-checkout-app-private-key: ${{ secrets.DAIWAJUKI_APP_PRIVATE_KEY }}
+```
+
+- **migration は `auth-migrations-ref` の版から読む**。consumer が pin しているタグと必ず揃える（ずらすと、ビルドに入った auth と DB のスキーマが食い違う）
+- `auth-migrations-runner-ref` は実行スクリプトの出所だけを変える。`migrate-schema.mjs` を含むタグ（v7.19.0 の次）を pin したら外す
+- 接続文字列はシークレットから読み、ホスト部を Auth Proxy（`127.0.0.1:5439`）に差し替える。Cloud Run 向けの `postgresql://USER:PW@/DB?host=/cloudsql/...` 形式のままでよい（`host=` と `sslmode` は外して使う）
+- 既に自前の drizzle migration で同じ列を作っている DB は、`migrate-schema` が「効果あり・台帳なし」と判定して SQL を流さず台帳に記録だけする
+- 初回は `auth-migrations-mode: check` で未適用の有無だけ見てから `apply` に戻すと安全
+- WIF の SA（`vars.WIF_SERVICE_ACCOUNT`）に `roles/cloudsql.client` と、シークレットへの `roles/secretmanager.secretAccessor` が要る
+- auth の DB を Cloud SQL 以外に置いている consumer、DB 正本が Laravel migration の consumer（ICPEstimating 等）は対象外。後者は `_auth` の migration の Laravel 版を自リポに足す
+
 ## inputs 一覧
 
 | input | 型 | デフォルト | 説明 |
@@ -100,6 +135,12 @@ jobs:
 | `additional-build-context-repos` | string | `''` | v0.7+ — BuildKit additional contexts に渡す追加 repo（改行区切り `name=owner/repo[@ref]`、image モードのみ）|
 | `build-args` | string | `''` | image モード時に Dockerfile へ渡す追加 build-arg（`KEY=VALUE` 改行区切り）。`GH_PACKAGES_TOKEN` は workflow 内で自動 prepend されるので明示不要。**機密値はここではなく `secrets-yaml` 経由 (Secret Manager) を推奨** — build-arg は image layer に残るため secret 用途に不向き |
 | `timeout-minutes` | number | `25` | ジョブタイムアウト |
+| `run-auth-migrations` | boolean | `false` | デプロイ前に `@daiwajuki/auth` の migration を当てる（上記節）。失敗したらデプロイしない |
+| `auth-migrations-ref` | string | `''` | 当てる migration の版（pin しているタグ）。`run-auth-migrations` 時に必須 |
+| `auth-migrations-runner-ref` | string | `''` | `migrate-schema.mjs` を取る ref。空なら `auth-migrations-ref` と同じ |
+| `auth-migrations-database-url-secret` | string | `''` | 接続文字列を持つ Secret Manager のシークレット名。`run-auth-migrations` 時に必須 |
+| `auth-migrations-cloudsql-instance` | string | `''` | 当てる先の Cloud SQL 接続名。空なら `cloudsql-instances`（1 つだけのとき） |
+| `auth-migrations-mode` | string | `'apply'` | `apply` / `check`（未適用があれば失敗）/ `dry-run` |
 
 ### secrets
 

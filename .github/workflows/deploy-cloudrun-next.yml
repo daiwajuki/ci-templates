@@ -111,6 +111,42 @@ on:
           指定すると deploy 時に `--timeout=<value>` を付与する。空なら付与しない（後方互換）。
         type: string
         default: ''
+      run-auth-migrations:
+        description: |
+          true なら Cloud Run へデプロイする前に @daiwajuki/auth の SQL migration を本番 DB に当てる
+          (apply-auth-migrations action)。失敗したらデプロイしない。既定 false（後方互換）。
+          auth-migrations-ref / auth-migrations-database-url-secret が必須。
+          daiwajuki-auth の checkout に external-checkout-app-* secret が要る。
+        type: boolean
+        default: false
+      auth-migrations-ref:
+        description: |
+          当てる migration の版。consumer が pin している daiwajuki-auth のタグ (例 v7.19.0)。
+          additional-build-context-repos の auth=...@vX.Y.Z と同じ値にする。
+        type: string
+        default: ''
+      auth-migrations-runner-ref:
+        description: |
+          migrate-schema.mjs を取る daiwajuki-auth の ref。空なら auth-migrations-ref と同じ。
+          pin している版に migrate-schema.mjs が無い (v7.19.0 以前) ときだけ指定する。
+        type: string
+        default: ''
+      auth-migrations-database-url-secret:
+        description: |
+          auth の DB の接続文字列を持つ Secret Manager のシークレット名
+          (secrets-yaml で DATABASE_URL に注入しているものと同じでよい)。
+        type: string
+        default: ''
+      auth-migrations-cloudsql-instance:
+        description: |
+          migration を当てる Cloud SQL の接続名。空なら cloudsql-instances をそのまま使う
+          (その場合 cloudsql-instances は 1 つだけであること)。
+        type: string
+        default: ''
+      auth-migrations-mode:
+        description: 'apply (既定) / check (未適用があれば失敗、DB は変えない) / dry-run'
+        type: string
+        default: 'apply'
     secrets:
       COLOCATE_TOKEN:
         description: |
@@ -355,6 +391,49 @@ jobs:
             ${{ steps.image.outputs.latest_tag }}
           cache-from: type=gha,scope=${{ inputs.service-name }}
           cache-to: type=gha,mode=max,scope=${{ inputs.service-name }}
+
+      # ─── @daiwajuki/auth の migration（opt-in） ───────────────────────────
+      # ビルドが通ってから、新リビジョンを作る前に当てる。失敗したらここで止まり、
+      # 「スキーマが古いまま新しい auth が動く」リビジョンを作らない (daiwajuki-auth#203)。
+      - name: Validate auth-migrations inputs
+        if: inputs.run-auth-migrations
+        id: auth-migrations
+        env:
+          AUTH_REF: ${{ inputs.auth-migrations-ref }}
+          DB_SECRET: ${{ inputs.auth-migrations-database-url-secret }}
+          INSTANCE: ${{ inputs.auth-migrations-cloudsql-instance || inputs.cloudsql-instances }}
+          APP_AVAILABLE: ${{ steps.app-token.outputs.available }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -n "$AUTH_REF" ] || missing+=(auth-migrations-ref)
+          [ -n "$DB_SECRET" ] || missing+=(auth-migrations-database-url-secret)
+          [ -n "$INSTANCE" ] || missing+=("auth-migrations-cloudsql-instance (または cloudsql-instances)")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::run-auth-migrations: true には次の input が必要です: ${missing[*]}"
+            exit 1
+          fi
+          if [[ "$INSTANCE" == *,* ]]; then
+            echo "::error::cloudsql-instances が複数あります。auth-migrations-cloudsql-instance で 1 つ指定してください"
+            exit 1
+          fi
+          if [ "$APP_AVAILABLE" != "true" ]; then
+            echo "::error::daiwajuki-auth (private) の checkout に external-checkout-app-id / external-checkout-app-private-key secret が必要です"
+            exit 1
+          fi
+          echo "instance=$INSTANCE" >> "$GITHUB_OUTPUT"
+
+      - name: Apply @daiwajuki/auth migrations
+        if: inputs.run-auth-migrations
+        uses: daiwajuki/ci-templates/.github/actions/apply-auth-migrations@v0
+        with:
+          auth-ref: ${{ inputs.auth-migrations-ref }}
+          runner-ref: ${{ inputs.auth-migrations-runner-ref }}
+          mode: ${{ inputs.auth-migrations-mode }}
+          cloudsql-instance: ${{ steps.auth-migrations.outputs.instance }}
+          database-url-secret: ${{ inputs.auth-migrations-database-url-secret }}
+          gcp-project-id: ${{ vars.GCP_PROJECT_ID }}
+          token: ${{ steps.app-token.outputs.token }}
 
       # ─── デプロイ（source / image 共通） ─────────────────────────────────
       - name: Deploy to Cloud Run
