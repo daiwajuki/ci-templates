@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.29.0](https://github.com/daiwajuki/ci-templates/compare/v0.28.0...v0.29.0) (2026-10-31)
+
+
+### Added
+
+* **deploy-next:** デプロイ前に @daiwajuki/auth の migration を当てる run-auth-migrations を追加 ([#111](https://github.com/daiwajuki/ci-templates/issues/111)) ([#112](https://github.com/daiwajuki/ci-templates/issues/112)) ([bc5abff](https://github.com/daiwajuki/ci-templates/commit/bc5abff6979b7361087c796d7134c1a3312d8455))
+
 ## [0.28.0](https://github.com/daiwajuki/ci-templates/compare/v0.27.0...v0.28.0) (2026-10-26)
 
 
